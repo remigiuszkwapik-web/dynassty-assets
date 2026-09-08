@@ -15,7 +15,11 @@ It is a single self-contained file (fonts load from Google Fonts).
 - **Select** one of your provinces (green = House Shu) on the map.
 - **✚ Recruit** troops with gold, **➜ Move** troops to a neighbouring friendly
   province, or **⚔ Attack** a neighbouring enemy province.
+- **Appoint a commander:** select one of your provinces and press APPOINT to open
+  the officer roster (a ROTK-style row of dot-portraits) and put one of your Shu
+  generals — Liu Bei, Guan Yu, Zhang Fei, Zhao Yun — in charge, or reassign them.
 - Battles resolve by troop strength × the commanding general's War/Lead stats + luck.
+  A conquered province's commander is captured and leaves play.
 - **End Turn** collects gold/food income, feeds your armies, and lets the AI
   houses (Wei, Wu and the independent warlords) recruit and attack.
 - Win by uniting all under heaven under Shu.

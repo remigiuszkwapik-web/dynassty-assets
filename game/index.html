@@ -183,6 +183,31 @@
   #over.on{display:flex}
   #over h2{font-family:'Press Start 2P',monospace;font-size:22px;margin:0;color:var(--gold);text-shadow:0 0 18px rgba(255,210,63,.5)}
   #over p{font-size:20px;color:var(--ink);max-width:34ch;margin:0}
+
+  /* ── Appoint-commander roster (ROTK-style portrait row) ── */
+  #roster{position:absolute;inset:12px;z-index:11;display:none;border-radius:8px;
+    background:rgba(4,8,16,.96);border:2px solid var(--led);
+    box-shadow:inset 0 0 0 2px #0a2415, 0 0 40px rgba(0,0,0,.6);
+    flex-direction:column;padding:14px 16px;gap:12px}
+  #roster.on{display:flex}
+  #rosterHead{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--led);
+    text-shadow:0 0 10px rgba(60,224,106,.4);text-align:center}
+  #rosterRow{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;overflow:auto;padding:4px}
+  .gcard{width:88px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:7px 5px;border:2px solid #16305c;border-radius:6px;background:#070f20;cursor:pointer;
+    transition:border-color .1s, background .1s}
+  .gcard:hover{border-color:#2b4f8f}
+  .gcard.sel{border-color:var(--led);background:#0c2417;box-shadow:0 0 0 1px var(--led)}
+  .gcard.cur{opacity:.55}
+  .gcard .ghead{width:72px;height:84px;image-rendering:pixelated;border:1px solid #123063;border-radius:3px}
+  .gcard .gnum{font-family:'Press Start 2P',monospace;font-size:8px;color:#6fa8d8}
+  .gcard .gname{font-size:15px;color:var(--ink);line-height:1.05;text-align:center;
+    min-height:30px;display:flex;align-items:center;justify-content:center}
+  .gcard .gstat{font-family:'Press Start 2P',monospace;font-size:6px;color:#6b8fb8;letter-spacing:.3px}
+  #rosterStats{min-height:96px;display:flex;flex-direction:column;gap:6px;
+    background:#050c1c;border:2px solid #16305c;border-radius:6px;padding:10px 14px;max-width:420px;margin:0 auto;width:100%}
+  #rosterStats .rname{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--led);margin-bottom:2px}
+  #rosterBtns{display:flex;gap:10px;justify-content:center}
 </style>
 
 <div id="crt">
@@ -204,6 +229,15 @@
         <p id="overText"></p>
         <button class="btn" id="restart">NEW CAMPAIGN</button>
       </div>
+      <div id="roster">
+        <div id="rosterHead">APPOINT COMMANDER</div>
+        <div id="rosterRow"></div>
+        <div id="rosterStats"></div>
+        <div id="rosterBtns">
+          <button class="btn btn-sm" id="rosterConfirm">CONFIRM</button>
+          <button class="btn btn-sm" id="rosterCancel">✕ CANCEL</button>
+        </div>
+      </div>
     </div>
 
     <aside id="panel">
@@ -214,6 +248,7 @@
           <div id="provCn"></div>
           <span id="ownerTag">—</span>
           <div id="genName"></div>
+          <button class="btn btn-sm" id="btnAppoint" style="display:none;margin-top:8px">★ APPOINT</button>
         </div>
       </div>
       <div class="stat-block" id="stats"></div>
@@ -266,23 +301,25 @@ for(const k in FACTIONS){FACTIONS[k].id=k;FACTIONS[k].gold=k==='shu'?500:400;FAC
 
 /* ---------- generals ---------- */
 // preset heroes get signature dot-portraits; the rest are generated from a seed.
+// home = allegiance; officers with no starting province wait in reserve.
 const GEN=[
-  {id:'liubei', name:'Liu Bei',   preset:'liubei', war:76, int:78, cha:99, lead:88},
-  {id:'guanyu', name:'Guan Yu',   preset:null, seed:12, war:97, int:75, cha:96, lead:95},
-  {id:'zhangfei',name:'Zhang Fei',preset:null, seed:7,  war:98, int:44, cha:70, lead:82},
-  {id:'caocao', name:'Cao Cao',   preset:'caocao', war:72, int:91, cha:96, lead:96},
-  {id:'xiahou', name:'Xiahou Dun',preset:null, seed:23, war:90, int:64, cha:82, lead:88},
-  {id:'zhangliao',name:'Zhang Liao',preset:null,seed:31,war:92, int:78, cha:80, lead:90},
-  {id:'sunce',  name:'Sun Ce',    preset:'sunce', war:92, int:70, cha:90, lead:88},
-  {id:'zhouyu', name:'Zhou Yu',   preset:null, seed:44, war:71, int:96, cha:92, lead:94},
-  {id:'ganning',name:'Gan Ning',  preset:null, seed:5,  war:94, int:66, cha:64, lead:80},
-  {id:'yuanshao',name:'Yuan Shao',preset:null, seed:52, war:62, int:74, cha:88, lead:78},
-  {id:'lubu',   name:'Lu Bu',     preset:null, seed:99, war:100,int:36, cha:56, lead:70},
-  {id:'dongzhuo',name:'Dong Zhuo',preset:null,seed:66, war:80, int:60, cha:40, lead:66},
-  {id:'mateng', name:'Ma Teng',   preset:null, seed:18, war:85, int:62, cha:78, lead:80},
-  {id:'liubiao',name:'Liu Biao',  preset:null, seed:71, war:58, int:70, cha:80, lead:72},
-  {id:'gongsun',name:'Gongsun Zan',preset:null,seed:88,war:81, int:58, cha:66, lead:74},
-  {id:'shixie', name:'Shi Xie',   preset:null, seed:40, war:52, int:72, cha:76, lead:68},
+  {id:'liubei', name:'Liu Bei',   home:'shu', preset:'liubei', war:76, int:78, cha:99, lead:88},
+  {id:'guanyu', name:'Guan Yu',   home:'shu', preset:null, seed:12, war:97, int:75, cha:96, lead:95},
+  {id:'zhangfei',name:'Zhang Fei',home:'shu', preset:null, seed:7,  war:98, int:44, cha:70, lead:82},
+  {id:'zhaoyun',name:'Zhao Yun',  home:'shu', preset:null, seed:14, war:96, int:76, cha:84, lead:88},
+  {id:'caocao', name:'Cao Cao',   home:'wei', preset:'caocao', war:72, int:91, cha:96, lead:96},
+  {id:'xiahou', name:'Xiahou Dun',home:'wei', preset:null, seed:23, war:90, int:64, cha:82, lead:88},
+  {id:'zhangliao',name:'Zhang Liao',home:'wei',preset:null,seed:31,war:92, int:78, cha:80, lead:90},
+  {id:'sunce',  name:'Sun Ce',    home:'wu',  preset:'sunce', war:92, int:70, cha:90, lead:88},
+  {id:'zhouyu', name:'Zhou Yu',   home:'wu',  preset:null, seed:44, war:71, int:96, cha:92, lead:94},
+  {id:'ganning',name:'Gan Ning',  home:'wu',  preset:null, seed:5,  war:94, int:66, cha:64, lead:80},
+  {id:'yuanshao',name:'Yuan Shao',home:'wei', preset:null, seed:52, war:62, int:74, cha:88, lead:78},
+  {id:'lubu',   name:'Lu Bu',     home:'neu', preset:null, seed:99, war:100,int:36, cha:56, lead:70},
+  {id:'dongzhuo',name:'Dong Zhuo',home:'neu',preset:null,seed:66, war:80, int:60, cha:40, lead:66},
+  {id:'mateng', name:'Ma Teng',   home:'neu', preset:null, seed:18, war:85, int:62, cha:78, lead:80},
+  {id:'liubiao',name:'Liu Biao',  home:'neu', preset:null, seed:71, war:58, int:70, cha:80, lead:72},
+  {id:'gongsun',name:'Gongsun Zan',home:'neu',preset:null,seed:88,war:81, int:58, cha:66, lead:74},
+  {id:'shixie', name:'Shi Xie',   home:'neu', preset:null, seed:40, war:52, int:72, cha:76, lead:68},
 ];
 const GENById=Object.fromEntries(GEN.map(g=>[g.id,g]));
 
@@ -329,18 +366,35 @@ PROV.forEach((p,i)=>{p.num=i+1;p.base=hslHex((i*47+18)%360,24,52);});
 // build land ownership grid + adjacency + centroid
 const cellOwner=new Int16Array(GC*GR).fill(-1);
 function buildMap(){
+  const nearest=new Int16Array(GC*GR);
   for(let y=0;y<GR;y++)for(let x=0;x<GC;x++){
     // domain-warp the sample point so region borders wander organically
     const wx=x+vnoise(x*0.09+11,y*0.09)*2.4*RES;
     const wy=y+vnoise(x*0.09,y*0.09+7)*2.4*RES;
-    let best=-1,bd=1e9;
+    let best=0,bd=1e9;
     for(let i=0;i<PROV.length;i++){
       const p=PROV[i];const d=Math.hypot(wx-p.col*RES,(wy-p.row*RES)*1.06);
       if(d<bd){bd=d;best=i;}
     }
+    nearest[y*GC+x]=best;
     const p=PROV[best];
     const edge=vnoise(x*0.16+2,y*0.16+9)*1.4*RES;
-    if(bd<=p.r*RES+edge) cellOwner[y*GC+x]=best;
+    // generous radius so neighbouring provinces overlap into ONE landmass
+    if(bd<=p.r*RES*1.5+edge) cellOwner[y*GC+x]=best;
+  }
+  // flood-fill sea inward from the border; any enclosed gap between provinces
+  // becomes land (assigned to its nearest centre) => a single connected China.
+  {
+    const seen=new Uint8Array(GC*GR), st=[];
+    for(let x=0;x<GC;x++){st.push(x);st.push((GR-1)*GC+x);}
+    for(let y=0;y<GR;y++){st.push(y*GC);st.push(y*GC+GC-1);}
+    while(st.length){const idx=st.pop();
+      if(seen[idx]||cellOwner[idx]>=0)continue;seen[idx]=1;
+      const x=idx%GC,y=(idx/GC)|0;
+      if(x>0)st.push(idx-1);if(x<GC-1)st.push(idx+1);
+      if(y>0)st.push(idx-GC);if(y<GR-1)st.push(idx+GC);
+    }
+    for(let i=0;i<GC*GR;i++)if(cellOwner[i]<0&&!seen[i])cellOwner[i]=nearest[i];
   }
   // centroids + neighbours
   PROV.forEach(p=>{p.cells=0;p.cx=0;p.cy=0;p.nb=new Set();});
@@ -548,8 +602,14 @@ function ringProvince(p,pulse){
 function fmt(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':''+n;}
 
 /* ═══════════════ GAME LOGIC ═══════════════ */
-function assignFactions(){PROV.forEach(p=>{const g=p.gen?GENById[p.gen]:null;if(g)g._faction=p.owner;});}
-assignFactions();
+// each general's portrait allegiance = home; loc tracks the province they lead
+// (null = waiting in reserve). Captured officers leave play.
+function initGenerals(){
+  GEN.forEach(g=>{g._faction=g.home;g.loc=null;g.captured=false;});
+  PROV.forEach(p=>{if(p.gen)GENById[p.gen].loc=p.id;});
+}
+initGenerals();
+function rosterOf(fid){return GEN.filter(g=>g.home===fid&&!g.captured);}
 
 function legalTargets(){
   if(!selected)return[];
@@ -579,9 +639,10 @@ function renderPanel(){
     tag=document.getElementById('ownerTag'),genName=document.getElementById('genName'),
     stats=document.getElementById('stats'),garr=document.getElementById('garrisonNum'),
     hint=document.getElementById('hint');
+  const appointBtn=document.getElementById('btnAppoint');
   if(!p){nameEl.textContent='—';cnEl.textContent='';tag.textContent='';genName.textContent='';
     stats.innerHTML='';garr.textContent='—';drawFace(document.getElementById('portrait'),null);
-    setButtons();return;}
+    appointBtn.style.display='none';setButtons();return;}
   nameEl.textContent=p.name+' PROVINCE';cnEl.textContent=p.cn;
   const F=FACTIONS[p.owner];tag.textContent=F.name;tag.style.color=F.color;
   const g=genFor(p);
@@ -593,6 +654,8 @@ function renderPanel(){
     row.innerHTML=`<span class="k">${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="n">${v}</span>`;
     stats.appendChild(row);});}
   else stats.innerHTML='<div class="hint">This land answers to no famed general — its militia fights untrained.</div>';
+  if(p.owner==='shu'){appointBtn.style.display='';appointBtn.textContent=g?'★ REASSIGN':'★ APPOINT';}
+  else appointBtn.style.display='none';
   hint.textContent=p.owner==='shu'
     ?'Your province. Recruit, move troops to allies, or launch an attack on a neighbour.'
     :'Enemy province. Select one of YOUR neighbouring provinces, then press Attack.';
@@ -615,6 +678,54 @@ function drawBanner(){
   else if(mode==='attack'){b.style.display='block';b.className='attack';b.textContent='ATTACK ▸ pick an enemy neighbour';}
   else b.style.display='none';
 }
+
+/* ---------- appoint a commander (ROTK-style roster) ---------- */
+let rosterProv=null, rosterPick=null;
+function appoint(prov,genId){
+  const g=GENById[genId];
+  if(g.loc&&PROVById[g.loc])PROVById[g.loc].gen=null;      // vacate the general's old post
+  if(prov.gen&&prov.gen!==genId)GENById[prov.gen].loc=null; // old commander back to reserve
+  prov.gen=genId;g.loc=prov.id;
+  log(`<b>${g.name}</b> takes command of ${prov.name} Province.`,'shu');
+}
+function openRoster(){
+  if(!selected||selected.owner!=='shu')return;
+  rosterProv=selected;rosterPick=null;
+  mode='select';target=null;closeOrder();drawBanner();setButtons();
+  document.getElementById('rosterHead').textContent='APPOINT COMMANDER — '+selected.name+' PROVINCE';
+  const row=document.getElementById('rosterRow');row.innerHTML='';
+  rosterOf('shu').forEach((g,i)=>{
+    const card=document.createElement('div');card.className='gcard';card._gid=g.id;
+    const cv=document.createElement('canvas');cv.width=72;cv.height=84;cv.className='ghead';
+    const num=document.createElement('div');num.className='gnum';num.textContent=(i+1)+'.';
+    const nm=document.createElement('div');nm.className='gname';nm.textContent=g.name;
+    const stt=document.createElement('div');stt.className='gstat';
+    stt.textContent=g.loc?(g.loc===rosterProv.id?'▸ HERE':('AT '+PROVById[g.loc].name)):'RESERVE';
+    card.append(num,cv,nm,stt);
+    if(g.loc===rosterProv.id)card.classList.add('cur');
+    card.onclick=()=>{rosterPick=g.id;renderRosterSel();};
+    card.ondblclick=()=>{rosterPick=g.id;confirmRoster();};
+    row.appendChild(card);drawFace(cv,g);
+  });
+  renderRosterSel();
+  document.getElementById('roster').classList.add('on');
+}
+function renderRosterSel(){
+  document.querySelectorAll('#rosterRow .gcard').forEach(c=>c.classList.toggle('sel',c._gid===rosterPick));
+  const s=document.getElementById('rosterStats');
+  if(!rosterPick){s.innerHTML='<div class="hint">Choose an officer of Shu to take command. Double-click to appoint.</div>';return;}
+  const g=GENById[rosterPick];
+  s.innerHTML='<div class="rname">⚑ '+g.name+(g.loc?('  ·  '+(g.loc===rosterProv.id?'already here':'currently at '+PROVById[g.loc].name)):'  ·  in reserve')+'</div>'+
+    [['WAR',g.war],['INT',g.int],['CHA',g.cha],['LEAD',g.lead]].map(([k,v])=>
+      `<div class="stat"><span class="k">${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="n">${v}</span></div>`).join('');
+}
+function confirmRoster(){
+  if(!rosterPick||!rosterProv){closeRoster();return;}
+  const g=GENById[rosterPick];
+  if(g.loc!==rosterProv.id)appoint(rosterProv,rosterPick);
+  closeRoster();renderPanel();
+}
+function closeRoster(){document.getElementById('roster').classList.remove('on');rosterProv=null;rosterPick=null;}
 
 /* ---------- orders (slider) ---------- */
 let orderKind=null; // 'recruit'|'move'|'attack'
@@ -668,12 +779,13 @@ function doBattle(from,to,commit,attackerFaction){
     // attacker wins — survivors proportional to the margin of victory
     const surv=Math.max(100,Math.round(commit*(ap-dp)/ap*0.9));
     const defName=FACTIONS[to.owner].name, atkName=FACTIONS[attackerFaction].name;
+    // the beaten commander is captured and removed from play
+    const capd=to.gen;if(capd){GENById[capd].loc=null;GENById[capd].captured=true;}
     to.owner=attackerFaction;to.troops=surv;mapDirty=true; // recolour the conquered land
-    // the beaten commander is captured/flees; the attacking general rides in
-    // only if the home province is now the weaker of the two.
+    // the attacking general rides in only if his home province is now the weaker
     const movedGen=(ag&&from.troops<surv)?from.gen:null;
     to.gen=movedGen;
-    if(movedGen){from.gen=null;GENById[movedGen]._faction=attackerFaction;}
+    if(movedGen){from.gen=null;GENById[movedGen].loc=to.id;}
     log(`<span class="${fc}">${atkName}</span> stormed <b>${to.name}</b>, routing <span class="${dc}">${defName}</span>! (${surv.toLocaleString()} hold the walls)`,fc);
   }else{
     // defender holds; both sides bleed, defender keeps a garrison
@@ -772,6 +884,9 @@ document.getElementById('btnRecruit').onclick=()=>{if(selected&&selected.owner==
 document.getElementById('btnMove').onclick=()=>{if(!selected)return;mode=mode==='move'?'select':'move';target=null;closeOrder();drawBanner();setButtons();};
 document.getElementById('btnAttack').onclick=()=>{if(!selected)return;mode=mode==='attack'?'select':'attack';target=null;closeOrder();drawBanner();setButtons();};
 document.getElementById('btnEnd').onclick=endTurn;
+document.getElementById('btnAppoint').onclick=openRoster;
+document.getElementById('rosterConfirm').onclick=confirmRoster;
+document.getElementById('rosterCancel').onclick=closeRoster;
 document.getElementById('orderRange').oninput=updateOrderAmt;
 document.getElementById('orderConfirm').onclick=confirmOrder;
 document.getElementById('orderCancel').onclick=()=>{closeOrder();mode='select';target=null;drawBanner();setButtons();};
