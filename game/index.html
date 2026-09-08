@@ -1,0 +1,757 @@
+<title>Dynasty Tactics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+  /* ── Single committed aesthetic: a green-phosphor / LED dot-matrix war console.
+     No theme toggle — this is an arcade screen, painted explicitly. ── */
+  :root{
+    --screen:#05080f;        /* deep CRT black-navy */
+    --screen2:#070c18;
+    --bezel:#0a1226;         /* console body */
+    --bezel-hi:#22407a;      /* bevel highlight */
+    --bezel-lo:#030712;      /* bevel shadow */
+    --frame:#4ad4ff;         /* cyan HUD frame, like the reference */
+    --led:#3ce06a;           /* phosphor green */
+    --led-dim:#1c6e39;
+    --gold:#ffd23f;
+    --food:#8fe36b;
+    --danger:#ff5545;
+    --ink:#bfe9ff;           /* cool panel text */
+    --shu:#3ad07a;           /* player — Liu Bei / Shu */
+    --wei:#e0433a;           /* Cao Cao / Wei */
+    --wu:#38c0d6;            /* Sun Ce / Wu */
+    --neutral:#d9a938;       /* independent warlords */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(120% 90% at 50% 0%, #0b1430 0%, #05070f 60%, #03050b 100%);
+    color:var(--ink);
+    font-family:'VT323',monospace;
+    min-height:100vh;
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:16px;
+  }
+  #crt{
+    width:100%;max-width:1120px;
+    background:linear-gradient(180deg,#0b1430,#070c18);
+    border-radius:14px;
+    padding:14px;
+    border:1px solid #17305e;
+    box-shadow:0 0 0 2px #030712, 0 24px 60px rgba(0,0,0,.6),
+               inset 0 0 0 2px #12224a;
+    position:relative;
+  }
+  /* scanline + vignette overlay for the CRT feel */
+  #crt::after{
+    content:"";position:absolute;inset:14px;border-radius:8px;pointer-events:none;z-index:5;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+    mix-blend-mode:multiply;
+  }
+  #crt::before{
+    content:"";position:absolute;inset:14px;border-radius:8px;pointer-events:none;z-index:6;
+    box-shadow:inset 0 0 90px rgba(0,0,0,.65);
+  }
+
+  .pixel{font-family:'Press Start 2P',monospace;letter-spacing:.5px}
+
+  /* ── HUD ── */
+  #hud{
+    display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    padding:10px 12px;margin-bottom:12px;
+    background:linear-gradient(180deg,#0c1c40,#081428);
+    border:2px solid #16305c;border-radius:8px;
+    box-shadow:inset 0 2px 0 var(--bezel-hi), inset 0 -3px 6px var(--bezel-lo);
+  }
+  .hud-chip{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 12px;border-radius:6px;
+    background:#050b1a;
+    border:2px solid #123063;
+    box-shadow:inset 0 0 8px rgba(74,212,255,.12);
+  }
+  .hud-chip .glyph{font-size:16px;line-height:1}
+  .hud-chip .val{font-family:'Press Start 2P',monospace;font-size:13px}
+  .hud-chip .lbl{font-size:15px;color:#6fa8d8;text-transform:uppercase;letter-spacing:1px}
+  #factionBadge{color:var(--shu)}
+  #goldVal{color:var(--gold)} #foodVal{color:var(--food)} #dayVal{color:var(--frame)}
+  #hud .spacer{flex:1 1 auto}
+  #title{font-family:'Press Start 2P',monospace;font-size:13px;color:var(--frame);
+    text-shadow:0 0 10px rgba(74,212,255,.5)}
+  #title small{display:block;font-family:'VT323';font-size:14px;color:#5f86b6;letter-spacing:2px;margin-top:4px}
+
+  /* ── Stage ── */
+  #stage{display:grid;grid-template-columns:1fr 288px;gap:12px}
+  @media(max-width:840px){#stage{grid-template-columns:1fr}}
+
+  #mapWrap{
+    position:relative;border:2px solid #12285a;border-radius:8px;overflow:hidden;
+    background:#04060d;box-shadow:inset 0 0 0 2px #081633, inset 0 0 40px rgba(0,0,0,.6);
+  }
+  #map{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:crosshair}
+  #modeBanner{
+    position:absolute;left:10px;top:10px;z-index:4;
+    font-family:'Press Start 2P',monospace;font-size:10px;
+    padding:7px 10px;border-radius:5px;display:none;
+    background:rgba(6,12,26,.9);border:2px solid var(--frame);color:var(--frame);
+  }
+  #modeBanner.attack{border-color:var(--danger);color:var(--danger)}
+
+  /* ── Side panel ── */
+  #panel{
+    background:linear-gradient(180deg,#0a1734,#070f22);
+    border:2px solid #16305c;border-radius:8px;padding:12px;
+    box-shadow:inset 0 2px 0 var(--bezel-hi), inset 0 -3px 6px var(--bezel-lo);
+    display:flex;flex-direction:column;gap:10px;min-height:100%;
+  }
+  #portraitRow{display:flex;gap:12px;align-items:center}
+  #portrait{
+    width:104px;height:120px;flex:0 0 auto;border-radius:5px;background:#04070f;
+    border:2px solid #1d3f77;box-shadow:inset 0 0 14px rgba(0,0,0,.7);image-rendering:pixelated;
+  }
+  #pInfo{min-width:0}
+  #provName{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--frame);line-height:1.5}
+  #provCn{font-size:20px;color:#6fa8d8;line-height:1;margin-top:2px}
+  #ownerTag{
+    display:inline-block;margin-top:8px;font-family:'Press Start 2P',monospace;font-size:8px;
+    padding:4px 7px;border-radius:4px;border:2px solid currentColor;
+  }
+  #genName{margin-top:6px;font-size:18px;color:var(--ink);line-height:1.1}
+  .stat-block{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+  .stat{display:flex;align-items:center;gap:8px;font-size:16px}
+  .stat .k{width:64px;color:#6fa8d8;text-transform:uppercase;font-size:13px;letter-spacing:1px}
+  .stat .bar{flex:1;height:9px;background:#081226;border:1px solid #143061;border-radius:3px;overflow:hidden}
+  .stat .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--led-dim),var(--led))}
+  .stat .n{width:26px;text-align:right;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--led)}
+  .divider{height:2px;background:linear-gradient(90deg,transparent,#1d3f77,transparent);margin:2px 0}
+  .garrison{display:flex;justify-content:space-between;align-items:baseline}
+  .garrison .lbl{font-size:14px;color:#6fa8d8;text-transform:uppercase;letter-spacing:1px}
+  .garrison .num{font-family:'Press Start 2P',monospace;font-size:16px;color:#fff}
+  .hint{font-size:15px;color:#5f86b6;line-height:1.25}
+
+  /* order (slider) panel */
+  #order{display:none;flex-direction:column;gap:8px;
+    background:#050c1c;border:2px solid #1d3f77;border-radius:6px;padding:10px}
+  #order.on{display:flex}
+  #orderTitle{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--frame)}
+  #orderTitle.attack{color:var(--danger)}
+  #order input[type=range]{width:100%;accent-color:var(--led)}
+  #orderAmt{font-family:'Press Start 2P',monospace;font-size:14px;color:#fff;text-align:center}
+  #order .row{display:flex;gap:8px}
+
+  /* ── Buttons / toolbar ── */
+  #toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .btn{
+    font-family:'Press Start 2P',monospace;font-size:10px;color:var(--led);
+    background:linear-gradient(180deg,#0f2444,#0a1830);
+    border:2px solid #1d3f77;border-radius:6px;
+    padding:11px 13px;cursor:pointer;letter-spacing:.5px;
+    box-shadow:inset 0 2px 0 #2b4f8f, inset 0 -3px 4px #030814, 0 2px 0 #030814;
+    transition:filter .08s, transform .05s;
+    text-shadow:0 0 6px rgba(60,224,106,.4);
+  }
+  .btn:hover{filter:brightness(1.25)}
+  .btn:active{transform:translateY(2px);box-shadow:inset 0 2px 6px #030814}
+  .btn:focus-visible{outline:2px solid var(--frame);outline-offset:2px}
+  .btn[disabled]{opacity:.4;cursor:not-allowed;filter:grayscale(.5)}
+  .btn.on{color:#04120a;background:linear-gradient(180deg,#4ff07a,#2fbd5c);border-color:#7dffa6}
+  .btn.attack{color:var(--danger);text-shadow:0 0 6px rgba(255,85,69,.5)}
+  .btn.attack.on{color:#180404;background:linear-gradient(180deg,#ff7a6d,#e0433a);border-color:#ff9d92}
+  .btn.wide{flex:1 1 auto;text-align:center}
+  .btn-sm{padding:8px 10px;font-size:9px}
+
+  /* ── Event log ── */
+  #log{
+    margin-top:12px;height:96px;overflow-y:auto;
+    background:#04070f;border:2px solid #12285a;border-radius:6px;padding:8px 12px;
+    font-size:17px;line-height:1.15;color:#8fbfe0;
+    box-shadow:inset 0 0 20px rgba(0,0,0,.5);
+  }
+  #log div{margin:1px 0}
+  #log .sys{color:#5f86b6}
+  #log .shu{color:var(--shu)} #log .wei{color:var(--wei)} #log .wu{color:var(--wu)} #log .neu{color:var(--neutral)}
+  #log .win{color:var(--gold)}
+  #log::-webkit-scrollbar{width:10px}
+  #log::-webkit-scrollbar-thumb{background:#1d3f77;border-radius:5px}
+
+  /* victory overlay */
+  #over{position:absolute;inset:14px;z-index:10;display:none;border-radius:8px;
+    background:rgba(3,6,14,.92);flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px}
+  #over.on{display:flex}
+  #over h2{font-family:'Press Start 2P',monospace;font-size:22px;margin:0;color:var(--gold);text-shadow:0 0 18px rgba(255,210,63,.5)}
+  #over p{font-size:20px;color:var(--ink);max-width:34ch;margin:0}
+</style>
+
+<div id="crt">
+  <div id="hud">
+    <div id="title">DYNASTY TACTICS<small>三 國 志 戦 記</small></div>
+    <div class="spacer"></div>
+    <div class="hud-chip"><span class="lbl">House</span><span class="val" id="factionBadge">SHU</span></div>
+    <div class="hud-chip"><span class="glyph">◉</span><span class="val" id="goldVal">500</span><span class="lbl">gold</span></div>
+    <div class="hud-chip"><span class="glyph">❖</span><span class="val" id="foodVal">500</span><span class="lbl">food</span></div>
+    <div class="hud-chip"><span class="glyph">☷</span><span class="val" id="dayVal">Day 1</span></div>
+  </div>
+
+  <div id="stage">
+    <div id="mapWrap">
+      <canvas id="map" width="720" height="460"></canvas>
+      <div id="modeBanner"></div>
+      <div id="over">
+        <h2 id="overTitle">VICTORY</h2>
+        <p id="overText"></p>
+        <button class="btn" id="restart">NEW CAMPAIGN</button>
+      </div>
+    </div>
+
+    <aside id="panel">
+      <div id="portraitRow">
+        <canvas id="portrait" width="104" height="120"></canvas>
+        <div id="pInfo">
+          <div id="provName">—</div>
+          <div id="provCn"></div>
+          <span id="ownerTag">—</span>
+          <div id="genName"></div>
+        </div>
+      </div>
+      <div class="stat-block" id="stats"></div>
+      <div class="divider"></div>
+      <div class="garrison"><span class="lbl">Garrison</span><span class="num" id="garrisonNum">—</span></div>
+      <div class="hint" id="hint">Select one of your provinces to give orders.</div>
+
+      <div id="order">
+        <div id="orderTitle">ORDER</div>
+        <input type="range" id="orderRange" min="1" max="100" value="50">
+        <div id="orderAmt">500</div>
+        <div class="row">
+          <button class="btn btn-sm wide" id="orderConfirm">CONFIRM</button>
+          <button class="btn btn-sm" id="orderCancel">✕</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="toolbar">
+    <button class="btn" id="btnRecruit">✚ RECRUIT</button>
+    <button class="btn" id="btnMove">➜ MOVE</button>
+    <button class="btn attack" id="btnAttack">⚔ ATTACK</button>
+    <div class="spacer" style="flex:1"></div>
+    <button class="btn wide" id="btnEnd">END TURN ▶</button>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   DYNASTY TACTICS — a dot-matrix Three-Kingdoms war console.
+   Everything (map + general portraits) is drawn as dots on canvas. No PNGs.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ---------- tiny deterministic RNG ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hash2(x,y){let h=x*374761393+y*668265263;h=(h^(h>>>13))*1274126177;return((h^(h>>>16))>>>0)/4294967296;}
+
+/* ---------- factions ---------- */
+const FACTIONS={
+  shu:{name:'SHU',color:'#3ad07a',logClass:'shu',isPlayer:true},
+  wei:{name:'WEI',color:'#e0433a',logClass:'wei',isPlayer:false},
+  wu :{name:'WU', color:'#38c0d6',logClass:'wu', isPlayer:false},
+  neu:{name:'WARLORDS',color:'#d9a938',logClass:'neu',isPlayer:false},
+};
+// per-faction economy
+for(const k in FACTIONS){FACTIONS[k].id=k;FACTIONS[k].gold=k==='shu'?500:400;FACTIONS[k].food=500;}
+
+/* ---------- generals ---------- */
+// preset heroes get signature dot-portraits; the rest are generated from a seed.
+const GEN=[
+  {id:'liubei', name:'Liu Bei',   preset:'liubei', war:76, int:78, cha:99, lead:88},
+  {id:'guanyu', name:'Guan Yu',   preset:null, seed:12, war:97, int:75, cha:96, lead:95},
+  {id:'zhangfei',name:'Zhang Fei',preset:null, seed:7,  war:98, int:44, cha:70, lead:82},
+  {id:'caocao', name:'Cao Cao',   preset:'caocao', war:72, int:91, cha:96, lead:96},
+  {id:'xiahou', name:'Xiahou Dun',preset:null, seed:23, war:90, int:64, cha:82, lead:88},
+  {id:'zhangliao',name:'Zhang Liao',preset:null,seed:31,war:92, int:78, cha:80, lead:90},
+  {id:'sunce',  name:'Sun Ce',    preset:'sunce', war:92, int:70, cha:90, lead:88},
+  {id:'zhouyu', name:'Zhou Yu',   preset:null, seed:44, war:71, int:96, cha:92, lead:94},
+  {id:'ganning',name:'Gan Ning',  preset:null, seed:5,  war:94, int:66, cha:64, lead:80},
+  {id:'yuanshao',name:'Yuan Shao',preset:null, seed:52, war:62, int:74, cha:88, lead:78},
+  {id:'lubu',   name:'Lu Bu',     preset:null, seed:99, war:100,int:36, cha:56, lead:70},
+  {id:'dongzhuo',name:'Dong Zhuo',preset:null,seed:66, war:80, int:60, cha:40, lead:66},
+  {id:'mateng', name:'Ma Teng',   preset:null, seed:18, war:85, int:62, cha:78, lead:80},
+  {id:'liubiao',name:'Liu Biao',  preset:null, seed:71, war:58, int:70, cha:80, lead:72},
+  {id:'gongsun',name:'Gongsun Zan',preset:null,seed:88,war:81, int:58, cha:66, lead:74},
+  {id:'shixie', name:'Shi Xie',   preset:null, seed:40, war:52, int:72, cha:76, lead:68},
+];
+const GENById=Object.fromEntries(GEN.map(g=>[g.id,g]));
+
+/* ---------- provinces (weighted-Voronoi blobs => dotted landmass) ---------- */
+// col,row on a 72x46 grid; east = higher col, north = lower row.
+const COLS=72, ROWS=46;
+const PROV=[
+  {id:'liang',name:'LIANG', cn:'涼州', col:11,row:13,r:7.4, owner:'neu', troops:2200, gold:70, food:70, gen:'mateng'},
+  {id:'bing', name:'BING',  cn:'并州', col:27,row:10,r:6.8, owner:'neu', troops:1800, gold:60, food:70, gen:'dongzhuo'},
+  {id:'you',  name:'YOU',   cn:'幽州', col:47,row:7, r:7.0, owner:'neu', troops:2400, gold:70, food:60, gen:'gongsun'},
+  {id:'ji',   name:'JI',    cn:'冀州', col:39,row:15,r:7.2, owner:'wei', troops:3200, gold:110,food:120,gen:'yuanshao'},
+  {id:'qing', name:'QING',  cn:'青州', col:53,row:18,r:6.4, owner:'neu', troops:1700, gold:80, food:90, gen:null},
+  {id:'si',   name:'SI',    cn:'司隸', col:30,row:21,r:6.8, owner:'wei', troops:3800, gold:130,food:110,gen:'caocao'},
+  {id:'yan',  name:'YAN',   cn:'兖州', col:41,row:22,r:6.4, owner:'wei', troops:2600, gold:100,food:110,gen:'xiahou'},
+  {id:'xu',   name:'XU',    cn:'徐州', col:52,row:26,r:6.6, owner:'neu', troops:2000, gold:100,food:120,gen:'lubu'},
+  {id:'yu',   name:'YU',    cn:'豫州', col:38,row:28,r:6.4, owner:'wei', troops:2400, gold:110,food:120,gen:'zhangliao'},
+  {id:'yi',   name:'YI',    cn:'益州', col:16,row:29,r:8.2, owner:'shu', troops:4200, gold:140,food:150,gen:'liubei'},
+  {id:'jing', name:'JING',  cn:'荊州', col:34,row:34,r:7.6, owner:'neu', troops:2600, gold:120,food:140,gen:'liubiao'},
+  {id:'yang', name:'YANG',  cn:'揚州', col:49,row:33,r:7.4, owner:'wu',  troops:3600, gold:130,food:140,gen:'sunce'},
+  {id:'jiao', name:'JIAO',  cn:'交州', col:39,row:42,r:6.8, owner:'neu', troops:1500, gold:70, food:100,gen:'shixie'},
+];
+const PROVById=Object.fromEntries(PROV.map(p=>[p.id,p]));
+
+// build land ownership grid + adjacency + centroid
+const cellOwner=new Int16Array(COLS*ROWS).fill(-1);
+function buildMap(){
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    let best=-1,bd=1e9;
+    for(let i=0;i<PROV.length;i++){
+      const p=PROV[i];const d=Math.hypot(x-p.col,(y-p.row)*1.08);
+      if(d<bd){bd=d;best=i;}
+    }
+    const p=PROV[best];
+    const jitter=(hash2(x+7,y+3)-0.5)*2.4;
+    if(bd<=p.r+jitter) cellOwner[y*COLS+x]=best;
+  }
+  // centroids + neighbors
+  PROV.forEach(p=>{p.cells=0;p.cx=0;p.cy=0;p.nb=new Set();});
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const i=cellOwner[y*COLS+x];if(i<0)continue;
+    const p=PROV[i];p.cells++;p.cx+=x;p.cy+=y;
+    // adjacency via right/down neighbour
+    const r=x+1<COLS?cellOwner[y*COLS+x+1]:-1;
+    const d=y+1<ROWS?cellOwner[(y+1)*COLS+x]:-1;
+    if(r>=0&&r!==i){p.nb.add(r);PROV[r].nb.add(i);}
+    if(d>=0&&d!==i){p.nb.add(d);PROV[d].nb.add(i);}
+  }
+  // union with an explicit adjacency graph so the realm is always fully
+  // connected (blob gaps must never leave a province — e.g. Yi — unreachable).
+  const idx=Object.fromEntries(PROV.map((p,i)=>[p.id,i]));
+  const LINKS={
+    liang:['bing','si','yi'], bing:['liang','si','ji','you'], you:['bing','ji','qing'],
+    ji:['bing','you','si','yan','qing'], qing:['you','ji','yan','xu'],
+    si:['liang','bing','ji','yan','yu','yi','jing'], yan:['ji','qing','si','xu','yu'],
+    xu:['qing','yan','yu','yang'], yu:['si','yan','xu','jing','yang'],
+    yi:['liang','si','jing'], jing:['yi','si','yu','yang','jiao'],
+    yang:['xu','yu','jing','jiao'], jiao:['jing','yang'],
+  };
+  for(const a in LINKS)LINKS[a].forEach(b=>{PROV[idx[a]].nb.add(idx[b]);PROV[idx[b]].nb.add(idx[a]);});
+  PROV.forEach(p=>{if(p.cells){p.cx/=p.cells;p.cy/=p.cells;}else{p.cx=p.col;p.cy=p.row;}
+    p.neighbors=[...p.nb].map(i=>PROV[i].id);});
+}
+buildMap();
+
+/* ═══════════════ PORTRAIT ENGINE — faces drawn as dots, no images ═══════════════ */
+const SKIN=['#e6b98a','#d8a878','#caa070','#b89068'];
+function facePalette(g){
+  const f=g._faction||'neu';
+  const armor={shu:'#2f7d4f',wei:'#7a2020',wu:'#1f6a78',neu:'#6b5320'}[f];
+  const hatCol={shu:'#35a05a',wei:'#59626f',wu:'#c9503f',neu:'#b98a2c'}[f];
+  return {armor,hatCol};
+}
+// returns 16x18 grid of palette codes
+function buildFace(g){
+  const W=16,H=18,grid=Array.from({length:H},()=>new Array(W).fill(0));
+  const set=(x,y,c)=>{if(x>=0&&x<W&&y>=0&&y<H)grid[y][x]=c;};
+  const rect=(x0,y0,x1,y1,c)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)set(x,y,c);};
+  // codes: 1 skin,2 skinShadow,3 hair,4 hat,5 hatShadow,6 eye,7 mouth,8 plume,9 armor
+  const rnd=mulberry32((g.seed||1)*2654435761>>>0);
+  let headgear, beard, grey=false, plume=false;
+  if(g.preset==='liubei'){headgear='cap';beard='long';}
+  else if(g.preset==='caocao'){headgear='helmet';beard='medium';plume=true;}
+  else if(g.preset==='sunce'){headgear='band';beard='none';}
+  else{
+    headgear=['helmet','cap','band'][Math.floor(rnd()*3)];
+    beard=['none','goatee','medium','long'][Math.floor(rnd()*4)];
+    grey=rnd()<0.18; plume=headgear==='helmet'&&rnd()<0.4;
+  }
+  const HAIR=grey?'#b9b4ad':'#241c1a';
+  // face silhouette (skin) — per-row spans
+  const span=[null,null,null,null,[6,9],[5,10],[5,10],[4,11],[4,11],[4,11],[5,10],[5,10],[5,10],[6,9],[6,9]];
+  for(let y=4;y<span.length;y++){if(span[y])rect(span[y][0],y,span[y][1],y,1);}
+  set(3,8,1);set(12,8,1);set(3,9,1);set(12,9,1); // ears
+  rect(10,6,11,12,2); // soft shadow on one cheek
+  // neck + shoulders (armor)
+  rect(6,15,9,15,1); rect(3,16,12,17,9); set(4,15,9);set(11,15,9);
+  // headgear
+  if(headgear==='cap'){rect(4,1,11,3,4);rect(4,3,11,3,5);set(3,4,4);set(12,4,4);
+    if(g.preset==='liubei'){set(3,5,4);set(3,6,4);set(12,5,4);set(12,6,4);} } // ribbons
+  else if(headgear==='helmet'){rect(4,0,11,3,4);rect(4,3,11,3,5);
+    set(3,4,4);set(12,4,4);set(3,5,5);set(12,5,5); // cheek guards
+    if(plume){set(7,-0,8);set(8,-0,8);set(7,-1,8);}}
+  else{rect(4,3,11,3,4); // headband
+    rect(6,0,9,2,3); // topknot hair
+    set(3,4,3);set(12,4,3);}
+  // hairline peeking under cap sides
+  if(headgear!=='helmet'){set(4,4,3);set(11,4,3);}
+  // brows + eyes
+  set(6,7,3);set(9,7,3);
+  set(6,8,6);set(9,8,6);
+  // nose hint
+  set(7,10,2);
+  // mouth / beard
+  if(beard==='none'){rect(7,12,8,12,7);}
+  else{
+    set(6,11,3);set(7,11,3);set(8,11,3);set(9,11,3); // moustache
+    if(beard==='goatee'){rect(7,12,8,14,HAIR==='#241c1a'?3:3);}
+    if(beard==='medium'){rect(6,12,9,14,3);set(7,15,3);set(8,15,3);}
+    if(beard==='long'){rect(5,12,10,15,3);rect(6,16,9,17,3);set(7,18-1,3);}
+  }
+  return {grid,HAIR,plume};
+}
+function drawFace(canvas,g){
+  const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // backdrop wash in faction hue
+  const pal=facePalette(g);
+  const gr=ctx.createLinearGradient(0,0,0,canvas.height);
+  gr.addColorStop(0,'#0a1224');gr.addColorStop(1,'#04070f');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(!g){return;}
+  const {grid,HAIR}=buildFace(g);
+  const W=16,H=18,pad=6;
+  const ds=Math.floor((canvas.width-pad*2)/W); // dot size
+  const ox=Math.floor((canvas.width-ds*W)/2), oy=6;
+  const colors={1:SKIN[(g.seed||1)%SKIN.length]||SKIN[0],2:'#b3855f',3:HAIR,4:pal.hatCol,
+    5:'#2a3138',6:'#140e0c',7:'#8a4a44',8:'#e0433a',9:pal.armor};
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const c=grid[y][x];if(!c)continue;
+    ctx.fillStyle=colors[c]||'#fff';
+    const px=ox+x*ds, py=oy+y*ds;
+    ctx.fillRect(px,py,ds-1,ds-1); // 1px gap => dot-matrix
+  }
+}
+
+/* ═══════════════ MAP RENDERING ═══════════════ */
+const map=document.getElementById('map'), mx=map.getContext('2d');
+const CELL=map.width/COLS; // ~10px
+let selected=null, mode='select', target=null, tick=0;
+
+function factionColor(id){return FACTIONS[id].color;}
+function shade(hex,f){const n=parseInt(hex.slice(1),16);let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=Math.round(r*f);g=Math.round(g*f);b=Math.round(b*f);return `rgb(${r},${g},${b})`;}
+
+function drawMap(){
+  tick++;
+  mx.imageSmoothingEnabled=false;
+  mx.fillStyle='#04060d';mx.fillRect(0,0,map.width,map.height);
+  const rDot=CELL*0.42;
+
+  // connection lines between neighbouring provinces (adjacency graph)
+  mx.lineWidth=1;
+  PROV.forEach(p=>{p.neighbors.forEach(nid=>{const q=PROVById[nid];if(p.id<nid){
+    mx.strokeStyle='rgba(74,212,255,0.10)';mx.beginPath();
+    mx.moveTo(p.cx*CELL+CELL/2,p.cy*CELL+CELL/2);mx.lineTo(q.cx*CELL+CELL/2,q.cy*CELL+CELL/2);mx.stroke();
+  }});});
+
+  // dots
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const i=cellOwner[y*COLS+x];
+    const px=x*CELL+CELL/2, py=y*CELL+CELL/2;
+    if(i<0){ // sea texture
+      mx.fillStyle='rgba(40,86,150,0.14)';
+      mx.beginPath();mx.arc(px,py,CELL*0.14,0,7);mx.fill();
+      continue;
+    }
+    const p=PROV[i];
+    let col=factionColor(p.owner);
+    // subtle per-dot brightness noise for the screen texture
+    const noise=0.82+hash2(x,y)*0.3;
+    mx.fillStyle=shade(col.length===7?col:'#3ad07a',noise*0.9);
+    mx.beginPath();mx.arc(px,py,rDot,0,7);mx.fill();
+  }
+
+  // highlight rings for legal targets
+  const pulse=0.5+0.5*Math.sin(tick*0.12);
+  if(selected){
+    const legal=legalTargets();
+    legal.forEach(id=>{const q=PROVById[id];
+      mx.strokeStyle=mode==='attack'
+        ?`rgba(255,85,69,${0.35+0.5*pulse})`:`rgba(74,212,255,${0.35+0.5*pulse})`;
+      mx.lineWidth=2; ringProvince(q,rDot,pulse);
+    });
+  }
+
+  // province markers: capital diamond + troop count
+  PROV.forEach((p,i)=>{
+    const cx=p.cx*CELL+CELL/2, cy=p.cy*CELL+CELL/2;
+    const sel=selected&&selected.id===p.id;
+    // capital diamond
+    mx.save();mx.translate(cx,cy-2);mx.rotate(Math.PI/4);
+    mx.fillStyle=sel?'#ffffff':shade(factionColor(p.owner),1);
+    mx.fillRect(-3,-3,6,6);
+    mx.strokeStyle='#02040a';mx.lineWidth=1;mx.strokeRect(-3,-3,6,6);
+    mx.restore();
+    // selection ring
+    if(sel){mx.strokeStyle=`rgba(255,255,255,${0.5+0.5*pulse})`;mx.lineWidth=2;ringProvince(p,rDot,pulse);}
+    // troop label
+    const t=fmt(p.troops);
+    mx.font="9px 'Press Start 2P'";mx.textAlign='center';mx.textBaseline='top';
+    mx.fillStyle='rgba(2,5,12,0.85)';
+    const w=mx.measureText(t).width;
+    mx.fillRect(cx-w/2-3,cy+6,w+6,13);
+    mx.fillStyle='#eaf6ff';mx.fillText(t,cx,cy+8);
+    // name label above
+    mx.font="7px 'Press Start 2P'";mx.fillStyle=shade(factionColor(p.owner),1.15);
+    mx.fillText(p.name,cx,cy-15);
+  });
+}
+function ringProvince(p,rDot,pulse){
+  const cx=p.cx*CELL+CELL/2, cy=p.cy*CELL+CELL/2;
+  const rad=Math.sqrt(p.cells)*CELL*0.42+3+pulse*1.5;
+  mx.beginPath();mx.arc(cx,cy,rad,0,7);mx.stroke();
+}
+function fmt(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':''+n;}
+
+/* ═══════════════ GAME LOGIC ═══════════════ */
+function assignFactions(){PROV.forEach(p=>{const g=p.gen?GENById[p.gen]:null;if(g)g._faction=p.owner;});}
+assignFactions();
+
+function legalTargets(){
+  if(!selected)return[];
+  if(mode==='move')return selected.neighbors.filter(id=>PROVById[id].owner===selected.owner);
+  if(mode==='attack')return selected.neighbors.filter(id=>PROVById[id].owner!==selected.owner);
+  return[];
+}
+
+function log(msg,cls){const l=document.getElementById('log');const d=document.createElement('div');
+  if(cls)d.className=cls;d.innerHTML=msg;l.appendChild(d);l.scrollTop=l.scrollHeight;
+  while(l.children.length>60)l.removeChild(l.firstChild);}
+
+function updateHUD(){
+  const f=FACTIONS.shu;
+  document.getElementById('goldVal').textContent=Math.round(f.gold);
+  document.getElementById('foodVal').textContent=Math.round(f.food);
+  document.getElementById('dayVal').textContent='Day '+day;
+}
+let day=1;
+
+function genFor(p){return p.gen?GENById[p.gen]:null;}
+function selectProvince(p){selected=p;mode='select';target=null;closeOrder();renderPanel();drawBanner();}
+
+function renderPanel(){
+  const p=selected;
+  const nameEl=document.getElementById('provName'),cnEl=document.getElementById('provCn'),
+    tag=document.getElementById('ownerTag'),genName=document.getElementById('genName'),
+    stats=document.getElementById('stats'),garr=document.getElementById('garrisonNum'),
+    hint=document.getElementById('hint');
+  if(!p){nameEl.textContent='—';cnEl.textContent='';tag.textContent='';genName.textContent='';
+    stats.innerHTML='';garr.textContent='—';drawFace(document.getElementById('portrait'),null);
+    setButtons();return;}
+  nameEl.textContent=p.name+' PROVINCE';cnEl.textContent=p.cn;
+  const F=FACTIONS[p.owner];tag.textContent=F.name;tag.style.color=F.color;
+  const g=genFor(p);
+  genName.textContent=g?('⚑ '+g.name):'(no commander)';
+  garr.textContent=p.troops.toLocaleString('en-US')+' men';
+  drawFace(document.getElementById('portrait'),g||{_faction:p.owner,seed:99});
+  if(g){stats.innerHTML='';[['WAR',g.war],['INT',g.int],['CHA',g.cha],['LEAD',g.lead]].forEach(([k,v])=>{
+    const row=document.createElement('div');row.className='stat';
+    row.innerHTML=`<span class="k">${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="n">${v}</span>`;
+    stats.appendChild(row);});}
+  else stats.innerHTML='<div class="hint">This land answers to no famed general — its militia fights untrained.</div>';
+  hint.textContent=p.owner==='shu'
+    ?'Your province. Recruit, move troops to allies, or launch an attack on a neighbour.'
+    :'Enemy province. Select one of YOUR neighbouring provinces, then press Attack.';
+  setButtons();
+}
+function setButtons(){
+  const own=selected&&selected.owner==='shu';
+  document.getElementById('btnRecruit').disabled=!own;
+  document.getElementById('btnMove').disabled=!own||legalNeighbours('move').length===0;
+  document.getElementById('btnAttack').disabled=!own||legalNeighbours('attack').length===0;
+  document.getElementById('btnMove').classList.toggle('on',mode==='move');
+  document.getElementById('btnAttack').classList.toggle('on',mode==='attack');
+}
+function legalNeighbours(m){if(!selected)return[];
+  return selected.neighbors.filter(id=>m==='move'?PROVById[id].owner==='shu':PROVById[id].owner!=='shu');}
+
+function drawBanner(){
+  const b=document.getElementById('modeBanner');
+  if(mode==='move'){b.style.display='block';b.className='';b.textContent='MOVE ▸ pick a friendly neighbour';}
+  else if(mode==='attack'){b.style.display='block';b.className='attack';b.textContent='ATTACK ▸ pick an enemy neighbour';}
+  else b.style.display='none';
+}
+
+/* ---------- orders (slider) ---------- */
+let orderKind=null; // 'recruit'|'move'|'attack'
+function openOrder(kind){
+  orderKind=kind;const o=document.getElementById('order');o.classList.add('on');
+  const title=document.getElementById('orderTitle');const range=document.getElementById('orderRange');
+  let max=1;
+  if(kind==='recruit'){title.textContent='RECRUIT (10 gold / 100)';title.className='';
+    max=Math.min(2000,Math.floor(FACTIONS.shu.gold/10)*100);range.min=100;range.step=100;range.max=Math.max(100,max);range.value=Math.min(range.max,500);}
+  else if(kind==='move'){title.textContent='MOVE → '+PROVById[target].name;title.className='';
+    max=selected.troops;range.min=100;range.step=100;range.max=Math.max(100,Math.floor(max/100)*100);range.value=Math.floor(max/2/100)*100||100;}
+  else{title.textContent='ATTACK → '+PROVById[target].name;title.className='attack';
+    max=selected.troops;range.min=100;range.step=100;range.max=Math.max(100,Math.floor(max/100)*100);range.value=range.max;}
+  updateOrderAmt();
+}
+function updateOrderAmt(){document.getElementById('orderAmt').textContent=
+  (+document.getElementById('orderRange').value).toLocaleString('en-US')+(orderKind==='recruit'?' men':' men');}
+function closeOrder(){orderKind=null;document.getElementById('order').classList.remove('on');}
+
+function confirmOrder(){
+  const amt=+document.getElementById('orderRange').value;
+  if(orderKind==='recruit'){
+    const cost=Math.ceil(amt/100)*10;
+    if(FACTIONS.shu.gold<cost){log('Not enough gold to recruit.','sys');return;}
+    FACTIONS.shu.gold-=cost;selected.troops+=amt;
+    log(`<b>${selected.name}</b>: recruited ${amt.toLocaleString()} men (−${cost} gold).`,'shu');
+  }else if(orderKind==='move'){
+    const q=PROVById[target];const m=Math.min(amt,selected.troops);
+    selected.troops-=m;q.troops+=m;
+    log(`Moved ${m.toLocaleString()} men: ${selected.name} → ${q.name}.`,'shu');
+  }else if(orderKind==='attack'){
+    doBattle(selected,PROVById[target],Math.min(amt,selected.troops),'shu');
+  }
+  closeOrder();mode='select';target=null;drawBanner();renderPanel();updateHUD();checkVictory();
+}
+
+/* ---------- battle ---------- */
+function power(troops,gen,defending){
+  const g=gen||{war:45,lead:55};
+  const base=troops*(1+g.war/140)*(0.6+g.lead/220);
+  const luck=0.82+Math.random()*0.36;
+  return base*luck*(defending?1.18:1);
+}
+function doBattle(from,to,commit,attackerFaction){
+  const ag=genFor(from), dg=genFor(to);
+  const ap=power(commit,ag,false), dp=power(to.troops,dg,true);
+  from.troops-=commit;
+  const total=ap+dp;
+  const fc=FACTIONS[attackerFaction].logClass, dc=FACTIONS[to.owner].logClass;
+  if(ap>dp){
+    // attacker wins — survivors proportional to the margin of victory
+    const surv=Math.max(100,Math.round(commit*(ap-dp)/ap*0.9));
+    const defName=FACTIONS[to.owner].name, atkName=FACTIONS[attackerFaction].name;
+    to.owner=attackerFaction;to.troops=surv;
+    // the beaten commander is captured/flees; the attacking general rides in
+    // only if the home province is now the weaker of the two.
+    const movedGen=(ag&&from.troops<surv)?from.gen:null;
+    to.gen=movedGen;
+    if(movedGen){from.gen=null;GENById[movedGen]._faction=attackerFaction;}
+    log(`<span class="${fc}">${atkName}</span> stormed <b>${to.name}</b>, routing <span class="${dc}">${defName}</span>! (${surv.toLocaleString()} hold the walls)`,fc);
+  }else{
+    // defender holds; both sides bleed, defender keeps a garrison
+    const defLoss=Math.min(to.troops-100,Math.round(to.troops*(ap/dp)*0.55));
+    to.troops=Math.max(100,to.troops-defLoss);
+    log(`<span class="${fc}">${FACTIONS[attackerFaction].name}</span>'s assault on <b>${to.name}</b> was repelled. Attackers lost ${commit.toLocaleString()} men.`,dc);
+  }
+}
+
+/* ---------- end turn + AI ---------- */
+function endTurn(){
+  if(gameOver)return;
+  closeOrder();mode='select';target=null;drawBanner();
+  // economy for everyone
+  for(const k in FACTIONS){
+    const owned=PROV.filter(p=>p.owner===k);
+    let gi=0,fi=0,troops=0;owned.forEach(p=>{gi+=p.gold;fi+=p.food;troops+=p.troops;});
+    const F=FACTIONS[k];F.gold+=gi;F.food+=fi-Math.round(troops*0.02);
+    if(F.food<0){ // starvation: desertion
+      let loss=Math.min(troops, -F.food*20);F.food=0;
+      // remove from biggest province
+      owned.sort((a,b)=>b.troops-a.troops);let li=0;
+      while(loss>0&&owned.length){const p=owned[li%owned.length];const d=Math.min(p.troops-100,Math.ceil(loss/2));if(d>0){p.troops-=d;loss-=d;}li++;if(li>40)break;}
+      if(k==='shu')log('Famine! Hungry troops desert your banners.','sys');
+    }
+  }
+  // AI factions act
+  ['wei','wu','neu'].forEach(runAI);
+  day+=10;
+  log(`— Day ${day}. The season turns. —`,'sys');
+  updateHUD();if(selected)renderPanel();checkVictory();
+}
+function runAI(fid){
+  if(gameOver)return;
+  const F=FACTIONS[fid];const mine=PROV.filter(p=>p.owner===fid);
+  const aggression=fid==='neu'?0.28:0.72;
+  // recruit into the province with the strongest neighbour threat
+  mine.forEach(p=>{
+    if(F.gold>=60&&Math.random()<(fid==='neu'?0.4:0.7)){
+      const buy=Math.min(Math.floor(F.gold/10)*100, 800);
+      if(buy>0){F.gold-=Math.ceil(buy/100)*10;p.troops+=buy;}
+    }
+  });
+  // attacks: each province may strike one weaker enemy neighbour
+  mine.forEach(p=>{
+    if(Math.random()>aggression)return;
+    const foes=p.neighbors.map(id=>PROVById[id]).filter(q=>q.owner!==fid);
+    if(!foes.length)return;
+    foes.sort((a,b)=>a.troops-b.troops);
+    const tgt=foes[0];
+    const commit=Math.floor(p.troops*0.7);
+    if(commit> tgt.troops*1.05 && p.troops-commit>=200){
+      doBattle(p,tgt,commit,fid);
+    }
+  });
+}
+
+/* ---------- victory ---------- */
+let gameOver=false;
+function checkVictory(){
+  const owners=new Set(PROV.map(p=>p.owner));
+  const shuCount=PROV.filter(p=>p.owner==='shu').length;
+  if(shuCount===0){return endGame(false,'Your house has fallen. The dream of a restored Han dies with Shu.');}
+  if(owners.size===1&&owners.has('shu')){return endGame(true,'All under heaven bows to Shu. Liu Bei restores the Han dynasty!');}
+  // also win if only shu among the 3 great houses remain and it holds majority
+  if(shuCount>=PROV.length-1){return endGame(true,`Shu commands ${shuCount} of ${PROV.length} provinces — the realm is all but yours.`);}
+}
+function endGame(win,text){
+  gameOver=true;const o=document.getElementById('over');o.classList.add('on');
+  document.getElementById('overTitle').textContent=win?'VICTORY':'DEFEAT';
+  document.getElementById('overTitle').style.color=win?'var(--gold)':'var(--danger)';
+  document.getElementById('overText').textContent=text;
+  log(text,win?'win':'sys');
+}
+
+/* ═══════════════ INPUT ═══════════════ */
+map.addEventListener('click',e=>{
+  if(gameOver)return;
+  const rect=map.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rect.left)/rect.width*COLS);
+  const y=Math.floor((e.clientY-rect.top)/rect.height*ROWS);
+  if(x<0||y<0||x>=COLS||y>=ROWS)return;
+  const i=cellOwner[y*COLS+x];if(i<0){return;}
+  const p=PROV[i];
+  if((mode==='move'||mode==='attack')&&selected){
+    const legal=legalTargets();
+    if(legal.includes(p.id)){target=p.id;openOrder(mode);return;}
+    // clicking own province re-selects
+    if(p.owner==='shu'){selectProvince(p);return;}
+    return;
+  }
+  selectProvince(p);
+});
+
+document.getElementById('btnRecruit').onclick=()=>{if(selected&&selected.owner==='shu'){mode='select';target=null;drawBanner();setButtons();openOrder('recruit');}};
+document.getElementById('btnMove').onclick=()=>{if(!selected)return;mode=mode==='move'?'select':'move';target=null;closeOrder();drawBanner();setButtons();};
+document.getElementById('btnAttack').onclick=()=>{if(!selected)return;mode=mode==='attack'?'select':'attack';target=null;closeOrder();drawBanner();setButtons();};
+document.getElementById('btnEnd').onclick=endTurn;
+document.getElementById('orderRange').oninput=updateOrderAmt;
+document.getElementById('orderConfirm').onclick=confirmOrder;
+document.getElementById('orderCancel').onclick=()=>{closeOrder();mode='select';target=null;drawBanner();setButtons();};
+document.getElementById('restart').onclick=()=>location.reload();
+
+/* ═══════════════ BOOT ═══════════════ */
+function boot(){
+  updateHUD();
+  selectProvince(PROVById['yi']);
+  log('The Han crumbles. From Yizhou, House Shu rises.','sys');
+  log('Tip: select a province, then Recruit · Move · Attack. End Turn to advance the season.','sys');
+  (function loop(){drawMap();requestAnimationFrame(loop);})();
+}
+// wait for pixel fonts so canvas labels render crisp, then boot (with a safety timeout)
+if(document.fonts&&document.fonts.load){
+  Promise.race([
+    Promise.all([document.fonts.load("9px 'Press Start 2P'"),document.fonts.load("16px 'VT323'")]),
+    new Promise(r=>setTimeout(r,1500))
+  ]).then(boot);
+}else boot();
+</script>
