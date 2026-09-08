@@ -109,7 +109,7 @@
   }
   #portraitRow{display:flex;gap:12px;align-items:center}
   #portrait{
-    width:104px;height:120px;flex:0 0 auto;border-radius:5px;background:#04070f;
+    width:116px;height:144px;flex:0 0 auto;border-radius:5px;background:#04070f;
     border:2px solid #1d3f77;box-shadow:inset 0 0 14px rgba(0,0,0,.7);image-rendering:pixelated;
   }
   #pInfo{min-width:0}
@@ -193,13 +193,13 @@
   #rosterHead{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--led);
     text-shadow:0 0 10px rgba(60,224,106,.4);text-align:center}
   #rosterRow{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;overflow:auto;padding:4px}
-  .gcard{width:88px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  .gcard{width:98px;display:flex;flex-direction:column;align-items:center;gap:3px;
     padding:7px 5px;border:2px solid #16305c;border-radius:6px;background:#070f20;cursor:pointer;
     transition:border-color .1s, background .1s}
   .gcard:hover{border-color:#2b4f8f}
   .gcard.sel{border-color:var(--led);background:#0c2417;box-shadow:0 0 0 1px var(--led)}
   .gcard.cur{opacity:.55}
-  .gcard .ghead{width:72px;height:84px;image-rendering:pixelated;border:1px solid #123063;border-radius:3px}
+  .gcard .ghead{width:84px;height:104px;image-rendering:pixelated;border:1px solid #123063;border-radius:3px}
   .gcard .gnum{font-family:'Press Start 2P',monospace;font-size:8px;color:#6fa8d8}
   .gcard .gname{font-size:15px;color:var(--ink);line-height:1.05;text-align:center;
     min-height:30px;display:flex;align-items:center;justify-content:center}
@@ -242,7 +242,7 @@
 
     <aside id="panel">
       <div id="portraitRow">
-        <canvas id="portrait" width="104" height="120"></canvas>
+        <canvas id="portrait" width="116" height="144"></canvas>
         <div id="pInfo">
           <div id="provName">—</div>
           <div id="provCn"></div>
@@ -424,84 +424,122 @@ function buildMap(){
 }
 buildMap();
 
-/* ═══════════════ PORTRAIT ENGINE — faces drawn as dots, no images ═══════════════ */
-const SKIN=['#e6b98a','#d8a878','#caa070','#b89068'];
+/* ═══════════════ PORTRAIT ENGINE — 32×40 shaded faces drawn as dots, no images ═══
+   Codes: 1 skinHi 2 skinMid 3 skinSh · 4 hairDark 5 hairMid · 6 hatBase 7 hatSh
+   8 hatHi 9 hatOrn · 10 plume · 11 eyeWhite 12 pupil · 14 mouth · 15 armor
+   16 armorSh 17 armorTrim · 18 ink outline                                       */
+const SKINS=[
+  {li:'#f0cfa2',mi:'#dcb083',sh:'#b1855a'},
+  {li:'#e8bd88',mi:'#d0a06e',sh:'#a3784d'},
+  {li:'#d9ac7c',mi:'#bf9160',sh:'#916a42'},
+  {li:'#caa06e',mi:'#ac8150',sh:'#7f5c38'},
+];
 function facePalette(g){
   const f=g._faction||'neu';
-  const armor={shu:'#2f7d4f',wei:'#7a2020',wu:'#1f6a78',neu:'#6b5320'}[f];
-  const hatCol={shu:'#35a05a',wei:'#59626f',wu:'#c9503f',neu:'#b98a2c'}[f];
-  return {armor,hatCol};
+  return {
+    shu:{hatBase:'#2f8a52',hatSh:'#1c5c37',hatHi:'#48b06e',hatOrn:'#e3bd3f',armor:'#2f7d4f',armorSh:'#1c5334',trim:'#e3bd3f'},
+    wei:{hatBase:'#6b727b',hatSh:'#434951',hatHi:'#9aa1aa',hatOrn:'#d8b23e',armor:'#7c2828',armorSh:'#521a1a',trim:'#cba64a'},
+    wu :{hatBase:'#b74c3b',hatSh:'#7e3129',hatHi:'#d66d59',hatOrn:'#d8b23e',armor:'#1f6f7e',armorSh:'#124851',trim:'#d8b23e'},
+    neu:{hatBase:'#9c7838',hatSh:'#6a5322',hatHi:'#c49b46',hatOrn:'#cbb36c',armor:'#6b5320',armorSh:'#48380f',trim:'#b9975a'},
+  }[f];
 }
-// returns 16x18 grid of palette codes
+// returns a 32×40 grid of palette codes with light/shadow modelling
 function buildFace(g){
-  const W=16,H=18,grid=Array.from({length:H},()=>new Array(W).fill(0));
-  const set=(x,y,c)=>{if(x>=0&&x<W&&y>=0&&y<H)grid[y][x]=c;};
+  const W=32,H=40,grid=Array.from({length:H},()=>new Array(W).fill(0));
+  const set=(x,y,c)=>{x=Math.round(x);y=Math.round(y);if(x>=0&&x<W&&y>=0&&y<H)grid[y][x]=c;};
   const rect=(x0,y0,x1,y1,c)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)set(x,y,c);};
-  // codes: 1 skin,2 skinShadow,3 hair,4 hat,5 hatShadow,6 eye,7 mouth,8 plume,9 armor
-  const rnd=mulberry32((g.seed||1)*2654435761>>>0);
-  let headgear, beard, grey=false, plume=false;
+  const rnd=mulberry32(((g.seed||1)*2654435761>>>0)||7);
+  let headgear,beard,plume=false,grey=false;
   if(g.preset==='liubei'){headgear='cap';beard='long';}
   else if(g.preset==='caocao'){headgear='helmet';beard='medium';plume=true;}
   else if(g.preset==='sunce'){headgear='band';beard='none';}
   else{
     headgear=['helmet','cap','band'][Math.floor(rnd()*3)];
     beard=['none','goatee','medium','long'][Math.floor(rnd()*4)];
-    grey=rnd()<0.18; plume=headgear==='helmet'&&rnd()<0.4;
+    plume=headgear==='helmet'&&rnd()<0.5; grey=rnd()<0.16;
   }
-  const HAIR=grey?'#b9b4ad':'#241c1a';
-  // face silhouette (skin) — per-row spans
-  const span=[null,null,null,null,[6,9],[5,10],[5,10],[4,11],[4,11],[4,11],[5,10],[5,10],[5,10],[6,9],[6,9]];
-  for(let y=4;y<span.length;y++){if(span[y])rect(span[y][0],y,span[y][1],y,1);}
-  set(3,8,1);set(12,8,1);set(3,9,1);set(12,9,1); // ears
-  rect(10,6,11,12,2); // soft shadow on one cheek
-  // neck + shoulders (armor)
-  rect(6,15,9,15,1); rect(3,16,12,17,9); set(4,15,9);set(11,15,9);
-  // headgear
-  if(headgear==='cap'){rect(4,1,11,3,4);rect(4,3,11,3,5);set(3,4,4);set(12,4,4);
-    if(g.preset==='liubei'){set(3,5,4);set(3,6,4);set(12,5,4);set(12,6,4);} } // ribbons
-  else if(headgear==='helmet'){rect(4,0,11,3,4);rect(4,3,11,3,5);
-    set(3,4,4);set(12,4,4);set(3,5,5);set(12,5,5); // cheek guards
-    if(plume){set(7,-0,8);set(8,-0,8);set(7,-1,8);}}
-  else{rect(4,3,11,3,4); // headband
-    rect(6,0,9,2,3); // topknot hair
-    set(3,4,3);set(12,4,3);}
-  // hairline peeking under cap sides
-  if(headgear!=='helmet'){set(4,4,3);set(11,4,3);}
-  // brows + eyes
-  set(6,7,3);set(9,7,3);
-  set(6,8,6);set(9,8,6);
-  // nose hint
-  set(7,10,2);
-  // mouth / beard
-  if(beard==='none'){rect(7,12,8,12,7);}
-  else{
-    set(6,11,3);set(7,11,3);set(8,11,3);set(9,11,3); // moustache
-    if(beard==='goatee'){rect(7,12,8,14,HAIR==='#241c1a'?3:3);}
-    if(beard==='medium'){rect(6,12,9,14,3);set(7,15,3);set(8,15,3);}
-    if(beard==='long'){rect(5,12,10,15,3);rect(6,16,9,17,3);set(7,18-1,3);}
+  const HD=4,HM=5;
+  // ── face (ellipse) with left light / right + chin shadow ──
+  const fcx=15.5,fcy=20,rx=7,ry=10.2;
+  for(let y=9;y<=30;y++)for(let x=8;x<=23;x++){
+    const nx=(x-fcx)/rx, ny=(y-fcy)/ry;
+    if(nx*nx+ny*ny<=1){
+      let c=2;
+      if(x-fcx<-2.2&&ny<0.55)c=1;      // lit left cheek/temple
+      if(x-fcx>2.4)c=3;                 // shadowed right cheek
+      if(y>=27)c=3;                     // under-chin
+      set(x,y,c);
+    }
   }
-  return {grid,HAIR,plume};
+  set(8,19,2);set(8,20,3);set(23,19,3);set(23,20,3); // ears
+  // ── neck + shoulders/robe ──
+  rect(13,29,18,33,2); rect(13,31,18,33,3); set(12,30,3);set(19,30,3);
+  rect(3,34,28,39,15); rect(3,37,28,39,16);          // robe + lower shadow
+  for(let y=34;y<=39;y++)for(let x=22;x<=28;x++)set(x,y,16); // right shoulder shadow
+  rect(11,32,20,33,17); rect(9,34,12,37,17); rect(19,34,22,37,17); // collar + lapels
+  // ── headgear ──
+  if(headgear==='cap'){
+    for(let y=5;y<=11;y++)for(let x=8;x<=23;x++){const nx=(x-15.5)/8.2,ny=(y-11)/7;
+      if(nx*nx+ny*ny<=1)set(x,y,y<=6?8:6);}
+    rect(8,10,23,11,7); set(15,4,9);set(16,4,9);      // brim shadow + top jewel
+    if(g.preset==='liubei'){rect(7,12,8,18,6);set(7,17,7);set(8,18,7);rect(23,12,24,18,6);set(24,17,7);set(23,18,7);}
+  }else if(headgear==='helmet'){
+    for(let y=3;y<=11;y++)for(let x=8;x<=23;x++){const nx=(x-15.5)/8.6,ny=(y-11)/8.6;
+      if(nx*nx+ny*ny<=1)set(x,y,y<=5?8:6);}
+    rect(8,9,23,9,7); rect(8,10,23,11,9);             // brow band ornament
+    rect(8,11,9,20,6); rect(22,11,23,20,6); set(9,20,7);set(22,20,7); rect(23,11,23,20,7); // cheek guards
+    set(15,2,9);set(16,2,9);                          // crest knob
+    if(plume){rect(14,0,17,4,10); set(13,1,10);set(18,2,10);}
+  }else{
+    for(let y=6;y<=12;y++)for(let x=9;x<=22;x++){const nx=(x-15.5)/7.6,ny=(y-12)/6.6;
+      if(nx*nx+ny*ny<=1)set(x,y,HD);}
+    rect(14,2,17,6,HD); set(15,1,HM);                 // topknot
+    rect(9,10,22,11,6); rect(9,11,22,11,7);           // headband
+  }
+  if(headgear!=='band'){set(9,12,HD);set(9,13,HD);set(22,12,HD);set(22,13,HD);} // sideburns
+  // ── brows, eyes, nose, mouth ──
+  rect(11,16,13,16,HD); rect(18,16,20,16,HD);         // brows
+  rect(11,18,13,18,11); rect(18,18,20,18,11);         // eye whites
+  set(12,18,12); set(19,18,12);                        // pupils
+  set(11,19,3);set(13,19,3);set(18,19,3);set(20,19,3); // lower lids (shadow)
+  rect(15,19,15,23,1); set(16,20,2);set(16,22,2);      // nose bridge highlight
+  set(14,23,3);set(17,23,3);set(15,24,3);              // nostrils / base shadow
+  rect(14,26,17,26,14); set(15,27,3);                  // mouth + shadow
+  // ── moustache + beard ──
+  if(beard!=='none'){
+    rect(12,25,19,25,HD); set(12,26,HD);set(19,26,HD); // moustache
+    if(beard==='goatee'){rect(14,27,17,30,HD);set(15,31,HD);set(16,31,HD);set(15,29,HM);}
+    if(beard==='medium'){rect(11,26,20,29,HD);rect(12,30,19,31,HD);rect(13,32,18,33,HD);
+      set(13,28,HM);set(17,29,HM);set(15,31,HM);}
+    if(beard==='long'){rect(10,26,21,31,HD);rect(11,32,20,34,HD);rect(12,35,19,36,HD);rect(14,37,17,37,HD);
+      set(12,28,HM);set(18,29,HM);set(15,33,HM);set(16,35,HM);}
+  }
+  // ── grey the hair/beard if old ──
+  if(grey){for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(grid[y][x]===HD)grid[y][x]=91;else if(grid[y][x]===HM)grid[y][x]=92;}}
+  // ── ink outline around the whole silhouette ──
+  const solid=(x,y)=>x>=0&&x<W&&y>=0&&y<H&&grid[y][x]!==0&&grid[y][x]!==18;
+  const edge=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(grid[y][x]===0&&(solid(x-1,y)||solid(x+1,y)||solid(x,y-1)||solid(x,y+1)))edge.push(y*W+x);}
+  edge.forEach(i=>grid[(i/W)|0][i%W]=18);
+  return {grid,skinIdx:g.preset==='liubei'?1:g.preset==='caocao'?2:g.preset==='sunce'?0:(Math.floor(rnd()*SKINS.length))};
 }
 function drawFace(canvas,g){
   const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  // backdrop wash in faction hue
-  const pal=facePalette(g);
   const gr=ctx.createLinearGradient(0,0,0,canvas.height);
-  gr.addColorStop(0,'#0a1224');gr.addColorStop(1,'#04070f');
+  gr.addColorStop(0,'#0c1526');gr.addColorStop(1,'#04070f');
   ctx.fillStyle=gr;ctx.fillRect(0,0,canvas.width,canvas.height);
-  if(!g){return;}
-  const {grid,HAIR}=buildFace(g);
-  const W=16,H=18,pad=6;
-  const ds=Math.floor((canvas.width-pad*2)/W); // dot size
-  const ox=Math.floor((canvas.width-ds*W)/2), oy=6;
-  const colors={1:SKIN[(g.seed||1)%SKIN.length]||SKIN[0],2:'#b3855f',3:HAIR,4:pal.hatCol,
-    5:'#2a3138',6:'#140e0c',7:'#8a4a44',8:'#e0433a',9:pal.armor};
+  if(!g)return;
+  const {grid,skinIdx}=buildFace(g),W=32,H=40,S=SKINS[skinIdx],pal=facePalette(g);
+  const COL={1:S.li,2:S.mi,3:S.sh,4:'#241c1a',5:'#463228',91:'#9a958f',92:'#c2bdb6',
+    6:pal.hatBase,7:pal.hatSh,8:pal.hatHi,9:pal.hatOrn,10:'#d8382c',
+    11:'#e9eff3',12:'#170f13',14:'#7c3a33',15:pal.armor,16:pal.armorSh,17:pal.trim,18:'#0a0806'};
+  const ds=Math.max(2,Math.floor(Math.min((canvas.width-2)/W,(canvas.height-2)/H)));
+  const ox=Math.round((canvas.width-ds*W)/2), oy=Math.round((canvas.height-ds*H)/2);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const c=grid[y][x];if(!c)continue;
-    ctx.fillStyle=colors[c]||'#fff';
-    const px=ox+x*ds, py=oy+y*ds;
-    ctx.fillRect(px,py,ds-1,ds-1); // 1px gap => dot-matrix
+    ctx.fillStyle=COL[c]||'#fff';
+    ctx.fillRect(ox+x*ds,oy+y*ds,ds,ds); // solid pixels for crisp detail
   }
 }
 
@@ -696,7 +734,7 @@ function openRoster(){
   const row=document.getElementById('rosterRow');row.innerHTML='';
   rosterOf('shu').forEach((g,i)=>{
     const card=document.createElement('div');card.className='gcard';card._gid=g.id;
-    const cv=document.createElement('canvas');cv.width=72;cv.height=84;cv.className='ghead';
+    const cv=document.createElement('canvas');cv.width=84;cv.height=104;cv.className='ghead';
     const num=document.createElement('div');num.className='gnum';num.textContent=(i+1)+'.';
     const nm=document.createElement('div');nm.className='gname';nm.textContent=g.name;
     const stt=document.createElement('div');stt.className='gstat';

@@ -29,8 +29,9 @@ It is a single self-contained file (fonts load from Google Fonts).
   black borders and a dithered blue sea (DOS *Romance of the Three Kingdoms*
   look); each province has its own base tone blended toward its owner's faction
   colour, and adjacency is an explicit graph so every region is reachable.
-- **Portraits:** `buildFace()` composes a 16×18 pixel grid from parametric
-  features (headgear, beard, faction armour); `drawFace()` renders it as dots.
+- **Portraits:** `buildFace()` composes a shaded 32×40 pixel bust from parametric
+  features (light/shadow modelling, brows/eyes/nose/mouth, headgear, beard, faction
+  armour, ink outline); `drawFace()` renders it as dots — no image files.
 - Single committed CRT aesthetic (Press Start 2P + VT323, phosphor-green on navy).
 
 `assets/portraits/*.png` are earlier high-res concept art, kept only as visual
