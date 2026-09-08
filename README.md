@@ -21,8 +21,10 @@ It is a single self-contained file (fonts load from Google Fonts).
 - Win by uniting all under heaven under Shu.
 
 ### Under the hood
-- **Map:** a weighted-Voronoi dot grid forms a China-shaped landmass; province
-  adjacency is an explicit graph so every region is reachable.
+- **Map:** a domain-warped weighted-Voronoi raster forms filled provinces with
+  black borders and a dithered blue sea (DOS *Romance of the Three Kingdoms*
+  look); each province has its own base tone blended toward its owner's faction
+  colour, and adjacency is an explicit graph so every region is reachable.
 - **Portraits:** `buildFace()` composes a 16×18 pixel grid from parametric
   features (headgear, beard, faction armour); `drawFace()` renders it as dots.
 - Single committed CRT aesthetic (Press Start 2P + VT323, phosphor-green on navy).

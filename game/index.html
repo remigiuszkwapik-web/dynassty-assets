@@ -286,9 +286,10 @@ const GEN=[
 ];
 const GENById=Object.fromEntries(GEN.map(g=>[g.id,g]));
 
-/* ---------- provinces (weighted-Voronoi blobs => dotted landmass) ---------- */
-// col,row on a 72x46 grid; east = higher col, north = lower row.
-const COLS=72, ROWS=46;
+/* ---------- provinces (weighted-Voronoi blobs => filled landmass) ---------- */
+// province anchors live in a 72x46 design space; the raster is RES× finer so
+// filled regions get smooth, organic borders. east = higher col, north = lower row.
+const COLS=72, ROWS=46, RES=2, GC=COLS*RES, GR=ROWS*RES;
 const PROV=[
   {id:'liang',name:'LIANG', cn:'涼州', col:11,row:13,r:7.4, owner:'neu', troops:2200, gold:70, food:70, gen:'mateng'},
   {id:'bing', name:'BING',  cn:'并州', col:27,row:10,r:6.8, owner:'neu', troops:1800, gold:60, food:70, gen:'dongzhuo'},
@@ -306,27 +307,49 @@ const PROV=[
 ];
 const PROVById=Object.fromEntries(PROV.map(p=>[p.id,p]));
 
+/* ---------- colour + value-noise helpers ---------- */
+function lerp(a,b,t){return a+(b-a)*t;}
+function smooth(t){return t*t*(3-2*t);}
+function vnoise(x,y){ // smooth value noise, output in [-1,1]
+  const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+  const u=smooth(xf),v=smooth(yf);
+  const a=lerp(hash2(xi,yi),hash2(xi+1,yi),u);
+  const b=lerp(hash2(xi,yi+1),hash2(xi+1,yi+1),u);
+  return lerp(a,b,v)*2-1;
+}
+function hexToRgb(h){const n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function rgbToHex(r,g,b){return'#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');}
+function mix(a,b,t){const A=hexToRgb(a),B=hexToRgb(b);return rgbToHex(lerp(A[0],B[0],t),lerp(A[1],B[1],t),lerp(A[2],B[2],t));}
+function hslHex(h,s,l){h/=360;s/=100;l/=100;const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+  const f=t=>{t=(t+1)%1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+  return rgbToHex(f(h+1/3)*255,f(h)*255,f(h-1/3)*255);}
+// each province: a DOS-style number + a distinct muted base tone (grundton)
+PROV.forEach((p,i)=>{p.num=i+1;p.base=hslHex((i*47+18)%360,24,52);});
+
 // build land ownership grid + adjacency + centroid
-const cellOwner=new Int16Array(COLS*ROWS).fill(-1);
+const cellOwner=new Int16Array(GC*GR).fill(-1);
 function buildMap(){
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+  for(let y=0;y<GR;y++)for(let x=0;x<GC;x++){
+    // domain-warp the sample point so region borders wander organically
+    const wx=x+vnoise(x*0.09+11,y*0.09)*2.4*RES;
+    const wy=y+vnoise(x*0.09,y*0.09+7)*2.4*RES;
     let best=-1,bd=1e9;
     for(let i=0;i<PROV.length;i++){
-      const p=PROV[i];const d=Math.hypot(x-p.col,(y-p.row)*1.08);
+      const p=PROV[i];const d=Math.hypot(wx-p.col*RES,(wy-p.row*RES)*1.06);
       if(d<bd){bd=d;best=i;}
     }
     const p=PROV[best];
-    const jitter=(hash2(x+7,y+3)-0.5)*2.4;
-    if(bd<=p.r+jitter) cellOwner[y*COLS+x]=best;
+    const edge=vnoise(x*0.16+2,y*0.16+9)*1.4*RES;
+    if(bd<=p.r*RES+edge) cellOwner[y*GC+x]=best;
   }
-  // centroids + neighbors
+  // centroids + neighbours
   PROV.forEach(p=>{p.cells=0;p.cx=0;p.cy=0;p.nb=new Set();});
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-    const i=cellOwner[y*COLS+x];if(i<0)continue;
+  for(let y=0;y<GR;y++)for(let x=0;x<GC;x++){
+    const i=cellOwner[y*GC+x];if(i<0)continue;
     const p=PROV[i];p.cells++;p.cx+=x;p.cy+=y;
     // adjacency via right/down neighbour
-    const r=x+1<COLS?cellOwner[y*COLS+x+1]:-1;
-    const d=y+1<ROWS?cellOwner[(y+1)*COLS+x]:-1;
+    const r=x+1<GC?cellOwner[y*GC+x+1]:-1;
+    const d=y+1<GR?cellOwner[(y+1)*GC+x]:-1;
     if(r>=0&&r!==i){p.nb.add(r);PROV[r].nb.add(i);}
     if(d>=0&&d!==i){p.nb.add(d);PROV[d].nb.add(i);}
   }
@@ -428,84 +451,99 @@ function drawFace(canvas,g){
   }
 }
 
-/* ═══════════════ MAP RENDERING ═══════════════ */
+/* ═══════════════ MAP RENDERING — filled DOS-style regions + borders ═══════════════ */
 const map=document.getElementById('map'), mx=map.getContext('2d');
-const CELL=map.width/COLS; // ~10px
-let selected=null, mode='select', target=null, tick=0;
+const CELL=map.width/GC; // ~5px raster cell
+let selected=null, mode='select', target=null, tick=0, mapDirty=true;
 
 function factionColor(id){return FACTIONS[id].color;}
 function shade(hex,f){const n=parseInt(hex.slice(1),16);let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
-  r=Math.round(r*f);g=Math.round(g*f);b=Math.round(b*f);return `rgb(${r},${g},${b})`;}
+  r=Math.round(r*f);g=Math.round(g*f);b=Math.round(b*f);
+  return `rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;}
+function cx(p){return p.cx*CELL+CELL/2;}
+function cy(p){return p.cy*CELL+CELL/2;}
+// province fill = its base tone blended toward the owner's faction colour
+function provFill(p){return mix(p.base, factionColor(p.owner), p.owner==='neu'?0.5:0.66);}
+
+/* ---- static base map (sea + filled regions + black borders), cached offscreen ---- */
+const mapBase=document.createElement('canvas');mapBase.width=map.width;mapBase.height=map.height;
+const mbx=mapBase.getContext('2d');
+const SEA='#173f6b', SEA2='#123458', BORDER='#050f1b', COAST='#050f1b';
+function renderMapBase(){
+  mbx.imageSmoothingEnabled=false;
+  const cw=Math.ceil(CELL)+1;
+  // sea with an ordered dither so water reads as texture, not flat fill
+  for(let y=0;y<GR;y++)for(let x=0;x<GC;x++){
+    mbx.fillStyle=((x+y)&1)?SEA:SEA2;
+    mbx.fillRect(Math.floor(x*CELL),Math.floor(y*CELL),cw,cw);
+  }
+  // filled land regions
+  for(let y=0;y<GR;y++)for(let x=0;x<GC;x++){
+    const i=cellOwner[y*GC+x];if(i<0)continue;
+    const p=PROV[i];const n=1+vnoise(x*0.5,y*0.5)*0.05;
+    mbx.fillStyle=shade(provFill(p),n);
+    mbx.fillRect(Math.floor(x*CELL),Math.floor(y*CELL),cw,cw);
+  }
+  // borders (province↔province) + coast (land↔sea) laid underneath
+  const bt=Math.max(1,Math.round(CELL*0.4));
+  for(let y=0;y<GR;y++)for(let x=0;x<GC;x++){
+    const i=cellOwner[y*GC+x];
+    const px=Math.floor(x*CELL),py=Math.floor(y*CELL),c=Math.ceil(CELL)+1;
+    const rt=x+1<GC?cellOwner[y*GC+x+1]:-2;
+    const dn=y+1<GR?cellOwner[(y+1)*GC+x]:-2;
+    if(i!==rt){mbx.fillStyle=(i<0||rt<0)?COAST:BORDER;mbx.fillRect(px+c-bt,py,bt,c);}
+    if(i!==dn){mbx.fillStyle=(i<0||dn<0)?COAST:BORDER;mbx.fillRect(px,py+c-bt,c,bt);}
+  }
+  // discreet map title, DOS-style
+  mbx.font="12px 'Press Start 2P'";mbx.textAlign='left';mbx.textBaseline='top';
+  mbx.fillStyle='rgba(180,220,255,0.28)';mbx.fillText('CHINA',12,map.height-24);
+}
 
 function drawMap(){
   tick++;
+  if(mapDirty){renderMapBase();mapDirty=false;}
   mx.imageSmoothingEnabled=false;
-  mx.fillStyle='#04060d';mx.fillRect(0,0,map.width,map.height);
-  const rDot=CELL*0.42;
-
-  // connection lines between neighbouring provinces (adjacency graph)
-  mx.lineWidth=1;
-  PROV.forEach(p=>{p.neighbors.forEach(nid=>{const q=PROVById[nid];if(p.id<nid){
-    mx.strokeStyle='rgba(74,212,255,0.10)';mx.beginPath();
-    mx.moveTo(p.cx*CELL+CELL/2,p.cy*CELL+CELL/2);mx.lineTo(q.cx*CELL+CELL/2,q.cy*CELL+CELL/2);mx.stroke();
-  }});});
-
-  // dots
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-    const i=cellOwner[y*COLS+x];
-    const px=x*CELL+CELL/2, py=y*CELL+CELL/2;
-    if(i<0){ // sea texture
-      mx.fillStyle='rgba(40,86,150,0.14)';
-      mx.beginPath();mx.arc(px,py,CELL*0.14,0,7);mx.fill();
-      continue;
-    }
-    const p=PROV[i];
-    let col=factionColor(p.owner);
-    // subtle per-dot brightness noise for the screen texture
-    const noise=0.82+hash2(x,y)*0.3;
-    mx.fillStyle=shade(col.length===7?col:'#3ad07a',noise*0.9);
-    mx.beginPath();mx.arc(px,py,rDot,0,7);mx.fill();
-  }
-
-  // highlight rings for legal targets
+  mx.drawImage(mapBase,0,0);
   const pulse=0.5+0.5*Math.sin(tick*0.12);
+
+  // routes + rings to legal targets (only for the selected province)
   if(selected){
-    const legal=legalTargets();
-    legal.forEach(id=>{const q=PROVById[id];
-      mx.strokeStyle=mode==='attack'
-        ?`rgba(255,85,69,${0.35+0.5*pulse})`:`rgba(74,212,255,${0.35+0.5*pulse})`;
-      mx.lineWidth=2; ringProvince(q,rDot,pulse);
+    const sx=cx(selected),sy=cy(selected),legal=legalTargets();
+    legal.forEach(id=>{const q=PROVById[id];const rgb=mode==='attack'?'255,85,69':'120,220,255';
+      mx.strokeStyle=`rgba(${rgb},${0.5+0.4*pulse})`;mx.lineWidth=2;
+      mx.setLineDash([6,5]);mx.beginPath();mx.moveTo(sx,sy);mx.lineTo(cx(q),cy(q));mx.stroke();mx.setLineDash([]);
+      mx.strokeStyle=`rgba(${rgb},${0.45+0.5*pulse})`;ringProvince(q,pulse);
     });
+    mx.strokeStyle=`rgba(255,255,255,${0.55+0.45*pulse})`;mx.lineWidth=2;ringProvince(selected,pulse);
   }
 
-  // province markers: capital diamond + troop count
-  PROV.forEach((p,i)=>{
-    const cx=p.cx*CELL+CELL/2, cy=p.cy*CELL+CELL/2;
-    const sel=selected&&selected.id===p.id;
-    // capital diamond
-    mx.save();mx.translate(cx,cy-2);mx.rotate(Math.PI/4);
-    mx.fillStyle=sel?'#ffffff':shade(factionColor(p.owner),1);
-    mx.fillRect(-3,-3,6,6);
-    mx.strokeStyle='#02040a';mx.lineWidth=1;mx.strokeRect(-3,-3,6,6);
-    mx.restore();
-    // selection ring
-    if(sel){mx.strokeStyle=`rgba(255,255,255,${0.5+0.5*pulse})`;mx.lineWidth=2;ringProvince(p,rDot,pulse);}
-    // troop label
-    const t=fmt(p.troops);
-    mx.font="9px 'Press Start 2P'";mx.textAlign='center';mx.textBaseline='top';
-    mx.fillStyle='rgba(2,5,12,0.85)';
-    const w=mx.measureText(t).width;
-    mx.fillRect(cx-w/2-3,cy+6,w+6,13);
-    mx.fillStyle='#eaf6ff';mx.fillText(t,cx,cy+8);
-    // name label above
-    mx.font="7px 'Press Start 2P'";mx.fillStyle=shade(factionColor(p.owner),1.15);
-    mx.fillText(p.name,cx,cy-15);
-  });
+  // province markers: DOS-style number badge + troop-strength chip
+  PROV.forEach(p=>drawMarker(p,selected&&selected.id===p.id,pulse));
 }
-function ringProvince(p,rDot,pulse){
-  const cx=p.cx*CELL+CELL/2, cy=p.cy*CELL+CELL/2;
-  const rad=Math.sqrt(p.cells)*CELL*0.42+3+pulse*1.5;
-  mx.beginPath();mx.arc(cx,cy,rad,0,7);mx.stroke();
+function drawMarker(p,sel,pulse){
+  const x=cx(p),y=cy(p),fc=factionColor(p.owner);
+  // number badge
+  mx.font="9px 'Press Start 2P'";mx.textAlign='center';mx.textBaseline='middle';
+  const label=''+p.num, bw=Math.max(17,mx.measureText(label).width+11), bh=16;
+  mx.fillStyle='#08131f';mx.fillRect(x-bw/2,y-bh/2,bw,bh);
+  mx.lineWidth=2;mx.strokeStyle=sel?'#ffffff':fc;mx.strokeRect(x-bw/2+1,y-bh/2+1,bw-2,bh-2);
+  mx.fillStyle=sel?'#ffffff':'#eef6ff';mx.fillText(label,x,y+1);
+  // troop chip below
+  const t=fmt(p.troops);
+  mx.font="7px 'Press Start 2P'";mx.textBaseline='top';
+  const tw=mx.measureText(t).width+8;
+  mx.fillStyle=shade(fc,0.42);mx.fillRect(x-tw/2,y+bh/2+2,tw,11);
+  mx.strokeStyle='rgba(4,10,20,0.9)';mx.lineWidth=1;mx.strokeRect(x-tw/2,y+bh/2+2,tw,11);
+  mx.fillStyle='#eef6ff';mx.fillText(t,x,y+bh/2+4);
+  // selected: floating name above the badge
+  if(sel){mx.font="8px 'Press Start 2P'";mx.textBaseline='bottom';
+    mx.fillStyle='rgba(6,12,24,0.85)';const nw=mx.measureText(p.name).width+8;
+    mx.fillRect(x-nw/2,y-bh/2-16,nw,13);
+    mx.fillStyle='#ffffff';mx.fillText(p.name,x,y-bh/2-4);}
+}
+function ringProvince(p,pulse){
+  const rad=Math.sqrt(p.cells)*CELL*0.46+3+pulse*1.5;
+  mx.beginPath();mx.arc(cx(p),cy(p),rad,0,7);mx.stroke();
 }
 function fmt(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':''+n;}
 
@@ -630,7 +668,7 @@ function doBattle(from,to,commit,attackerFaction){
     // attacker wins — survivors proportional to the margin of victory
     const surv=Math.max(100,Math.round(commit*(ap-dp)/ap*0.9));
     const defName=FACTIONS[to.owner].name, atkName=FACTIONS[attackerFaction].name;
-    to.owner=attackerFaction;to.troops=surv;
+    to.owner=attackerFaction;to.troops=surv;mapDirty=true; // recolour the conquered land
     // the beaten commander is captured/flees; the attacking general rides in
     // only if the home province is now the weaker of the two.
     const movedGen=(ag&&from.troops<surv)?from.gen:null;
@@ -715,10 +753,10 @@ function endGame(win,text){
 map.addEventListener('click',e=>{
   if(gameOver)return;
   const rect=map.getBoundingClientRect();
-  const x=Math.floor((e.clientX-rect.left)/rect.width*COLS);
-  const y=Math.floor((e.clientY-rect.top)/rect.height*ROWS);
-  if(x<0||y<0||x>=COLS||y>=ROWS)return;
-  const i=cellOwner[y*COLS+x];if(i<0){return;}
+  const x=Math.floor((e.clientX-rect.left)/rect.width*GC);
+  const y=Math.floor((e.clientY-rect.top)/rect.height*GR);
+  if(x<0||y<0||x>=GC||y>=GR)return;
+  const i=cellOwner[y*GC+x];if(i<0){return;}
   const p=PROV[i];
   if((mode==='move'||mode==='attack')&&selected){
     const legal=legalTargets();
