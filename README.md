@@ -17,11 +17,17 @@ Works on desktop and **phone** (portrait) — everything is tap-driven, no doubl
 - **Select** one of your provinces (green = House Shu) on the map.
 - **✚ Recruit** troops with gold, **➜ Move** troops to a neighbouring friendly
   province, or **⚔ Attack** a neighbouring enemy province.
-- **Appoint a commander:** select one of your provinces and press APPOINT to open
-  the officer roster (a ROTK-style row of dot-portraits) and put one of your Shu
-  generals — Liu Bei, Guan Yu, Zhang Fei, Zhao Yun — in charge, or reassign them.
-- Battles resolve by troop strength × the commanding general's War/Lead stats + luck.
-  A conquered province's commander is captured and leaves play.
+- **Armies of up to 4 officers:** press OFFICERS on one of your provinces to open
+  the roster (ROTK-style dot-portraits) and tap to add/remove your Shu generals —
+  Liu Bei, Guan Yu, Zhang Fei, Zhao Yun. The **commander is the highest-level
+  officer**, and their **level sets how many officers the army may hold** (Lv N →
+  N slots, up to 4).
+- **Levels & growth:** each general has a level (shown as `Lv N`). Winning battles
+  grants XP; on level-up their War/Int/Cha/Lead rise and the army can hold one more
+  officer. Generals start at set ranks (e.g. Cao Cao and Lü Bu at Lv 4).
+- **Battles** resolve by troop strength × the commander's War/Lead + **35 % of each
+  other officer's War** + luck. Winning an assault marches the whole army into the
+  conquered province; the defenders' officers are captured and leave play.
 - **End Turn** collects gold/food income, feeds your armies, and lets the AI
   houses (Wei, Wu and the independent warlords) recruit and attack.
 - Win by uniting all under heaven under Shu.

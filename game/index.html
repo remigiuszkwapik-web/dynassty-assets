@@ -123,6 +123,15 @@
     padding:4px 7px;border-radius:4px;border:2px solid currentColor;
   }
   #genName{margin-top:6px;font-size:18px;color:var(--ink);line-height:1.1}
+  .lvbadge{font-family:'Press Start 2P',monospace;font-size:8px;color:#04120a;background:var(--led);
+    padding:2px 4px;border-radius:3px;vertical-align:middle;margin-left:4px}
+  /* army officer roster in the side panel */
+  .officers{margin-top:8px;border-top:2px solid #143061;padding-top:8px;display:flex;flex-direction:column;gap:4px}
+  .officers .ohead{font-family:'Press Start 2P',monospace;font-size:9px;color:#6fa8d8;letter-spacing:.5px}
+  .orow{display:flex;align-items:baseline;gap:8px;font-size:16px}
+  .orow .oname{flex:1;color:var(--ink)}
+  .orow .olv{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--led)}
+  .orow .owar{font-size:14px;color:#6fa8d8;font-variant-numeric:tabular-nums}
   .stat-block{display:flex;flex-direction:column;gap:5px;margin-top:2px}
   .stat{display:flex;align-items:center;gap:8px;font-size:16px}
   .stat .k{width:64px;color:#6fa8d8;text-transform:uppercase;font-size:13px;letter-spacing:1px}
@@ -270,8 +279,8 @@
         <div id="rosterRow"></div>
         <div id="rosterStats"></div>
         <div id="rosterBtns">
-          <button class="btn btn-sm" id="rosterConfirm">CONFIRM</button>
-          <button class="btn btn-sm" id="rosterCancel">✕ CANCEL</button>
+          <button class="btn btn-sm" id="rosterConfirm">✓ DONE</button>
+          <button class="btn btn-sm" id="rosterCancel">✕ CLOSE</button>
         </div>
       </div>
     </div>
@@ -338,24 +347,25 @@ for(const k in FACTIONS){FACTIONS[k].id=k;FACTIONS[k].gold=k==='shu'?500:400;FAC
 /* ---------- generals ---------- */
 // preset heroes get signature dot-portraits; the rest are generated from a seed.
 // home = allegiance; officers with no starting province wait in reserve.
+// lvl = starting rank: sets a commander's army capacity (min(4,lvl)) and grows via XP.
 const GEN=[
-  {id:'liubei', name:'Liu Bei',   home:'shu', preset:'liubei', war:76, int:78, cha:99, lead:88},
-  {id:'guanyu', name:'Guan Yu',   home:'shu', preset:null, seed:12, war:97, int:75, cha:96, lead:95},
-  {id:'zhangfei',name:'Zhang Fei',home:'shu', preset:null, seed:7,  war:98, int:44, cha:70, lead:82},
-  {id:'zhaoyun',name:'Zhao Yun',  home:'shu', preset:null, seed:14, war:96, int:76, cha:84, lead:88},
-  {id:'caocao', name:'Cao Cao',   home:'wei', preset:'caocao', war:72, int:91, cha:96, lead:96},
-  {id:'xiahou', name:'Xiahou Dun',home:'wei', preset:null, seed:23, war:90, int:64, cha:82, lead:88},
-  {id:'zhangliao',name:'Zhang Liao',home:'wei',preset:null,seed:31,war:92, int:78, cha:80, lead:90},
-  {id:'sunce',  name:'Sun Ce',    home:'wu',  preset:'sunce', war:92, int:70, cha:90, lead:88},
-  {id:'zhouyu', name:'Zhou Yu',   home:'wu',  preset:null, seed:44, war:71, int:96, cha:92, lead:94},
-  {id:'ganning',name:'Gan Ning',  home:'wu',  preset:null, seed:5,  war:94, int:66, cha:64, lead:80},
-  {id:'yuanshao',name:'Yuan Shao',home:'wei', preset:null, seed:52, war:62, int:74, cha:88, lead:78},
-  {id:'lubu',   name:'Lu Bu',     home:'neu', preset:null, seed:99, war:100,int:36, cha:56, lead:70},
-  {id:'dongzhuo',name:'Dong Zhuo',home:'neu',preset:null,seed:66, war:80, int:60, cha:40, lead:66},
-  {id:'mateng', name:'Ma Teng',   home:'neu', preset:null, seed:18, war:85, int:62, cha:78, lead:80},
-  {id:'liubiao',name:'Liu Biao',  home:'neu', preset:null, seed:71, war:58, int:70, cha:80, lead:72},
-  {id:'gongsun',name:'Gongsun Zan',home:'neu',preset:null,seed:88,war:81, int:58, cha:66, lead:74},
-  {id:'shixie', name:'Shi Xie',   home:'neu', preset:null, seed:40, war:52, int:72, cha:76, lead:68},
+  {id:'liubei', name:'Liu Bei',   home:'shu', lvl:3, preset:'liubei', war:76, int:78, cha:99, lead:88},
+  {id:'guanyu', name:'Guan Yu',   home:'shu', lvl:3, preset:null, seed:12, war:97, int:75, cha:96, lead:95},
+  {id:'zhangfei',name:'Zhang Fei',home:'shu', lvl:3, preset:null, seed:7,  war:98, int:44, cha:70, lead:82},
+  {id:'zhaoyun',name:'Zhao Yun',  home:'shu', lvl:2, preset:null, seed:14, war:96, int:76, cha:84, lead:88},
+  {id:'caocao', name:'Cao Cao',   home:'wei', lvl:4, preset:'caocao', war:72, int:91, cha:96, lead:96},
+  {id:'xiahou', name:'Xiahou Dun',home:'wei', lvl:3, preset:null, seed:23, war:90, int:64, cha:82, lead:88},
+  {id:'zhangliao',name:'Zhang Liao',home:'wei',lvl:3,preset:null,seed:31,war:92, int:78, cha:80, lead:90},
+  {id:'sunce',  name:'Sun Ce',    home:'wu',  lvl:3, preset:'sunce', war:92, int:70, cha:90, lead:88},
+  {id:'zhouyu', name:'Zhou Yu',   home:'wu',  lvl:3, preset:null, seed:44, war:71, int:96, cha:92, lead:94},
+  {id:'ganning',name:'Gan Ning',  home:'wu',  lvl:2, preset:null, seed:5,  war:94, int:66, cha:64, lead:80},
+  {id:'yuanshao',name:'Yuan Shao',home:'wei', lvl:3, preset:null, seed:52, war:62, int:74, cha:88, lead:78},
+  {id:'lubu',   name:'Lu Bu',     home:'neu', lvl:4, preset:null, seed:99, war:100,int:36, cha:56, lead:70},
+  {id:'dongzhuo',name:'Dong Zhuo',home:'neu',lvl:2,preset:null,seed:66, war:80, int:60, cha:40, lead:66},
+  {id:'mateng', name:'Ma Teng',   home:'neu', lvl:2, preset:null, seed:18, war:85, int:62, cha:78, lead:80},
+  {id:'liubiao',name:'Liu Biao',  home:'neu', lvl:2, preset:null, seed:71, war:58, int:70, cha:80, lead:72},
+  {id:'gongsun',name:'Gongsun Zan',home:'neu',lvl:2,preset:null,seed:88,war:81, int:58, cha:66, lead:74},
+  {id:'shixie', name:'Shi Xie',   home:'neu', lvl:1, preset:null, seed:40, war:52, int:72, cha:76, lead:68},
 ];
 const GENById=Object.fromEntries(GEN.map(g=>[g.id,g]));
 
@@ -679,11 +689,36 @@ function fmt(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')
 // each general's portrait allegiance = home; loc tracks the province they lead
 // (null = waiting in reserve). Captured officers leave play.
 function initGenerals(){
-  GEN.forEach(g=>{g._faction=g.home;g.loc=null;g.captured=false;});
-  PROV.forEach(p=>{if(p.gen)GENById[p.gen].loc=p.id;});
+  GEN.forEach(g=>{g._faction=g.home;g.loc=null;g.captured=false;g.xp=0;});
+  PROV.forEach(p=>{p.army=p.gen?[p.gen]:[];p.army.forEach(id=>GENById[id].loc=p.id);delete p.gen;});
 }
 initGenerals();
 function rosterOf(fid){return GEN.filter(g=>g.home===fid&&!g.captured);}
+
+/* ---------- army helpers: a province fields up to 4 officers ---------- */
+function armyOf(p){return (p.army||[]).map(id=>GENById[id]);}          // general objects
+function commanderOf(p){                                                // highest level leads
+  const a=armyOf(p);if(!a.length)return null;
+  return a.reduce((b,g)=>(g.lvl>b.lvl||(g.lvl===b.lvl&&g.lead>b.lead))?g:b);
+}
+function armyCap(p,extraLvl){                                           // slots = min(4, top level)
+  const lv=Math.max(extraLvl||0,...armyOf(p).map(g=>g.lvl),0);
+  return Math.min(4,Math.max(1,lv));
+}
+function addToArmy(prov,genId){
+  const g=GENById[genId];if(!prov.army)prov.army=[];
+  if(prov.army.includes(genId))return false;
+  if(prov.army.length>=armyCap(prov,g.lvl))return false;               // respect capacity
+  if(g.loc&&PROVById[g.loc]){const o=PROVById[g.loc];o.army=(o.army||[]).filter(x=>x!==genId);} // leave old post
+  prov.army.push(genId);g.loc=prov.id;
+  log(`<b>${g.name}</b> (Lv${g.lvl}) joins the army of ${prov.name}.`,'shu');
+  return true;
+}
+function removeFromArmy(prov,genId){
+  prov.army=(prov.army||[]).filter(x=>x!==genId);
+  GENById[genId].loc=null;
+  log(`<b>${GENById[genId].name}</b> stands down from ${prov.name}.`,'shu');
+}
 
 function legalTargets(){
   if(!selected)return[];
@@ -704,7 +739,6 @@ function updateHUD(){
 }
 let day=1;
 
-function genFor(p){return p.gen?GENById[p.gen]:null;}
 function selectProvince(p){selected=p;mode='select';target=null;closeOrder();renderPanel();drawBanner();}
 
 function renderPanel(){
@@ -719,16 +753,22 @@ function renderPanel(){
     appointBtn.style.display='none';setButtons();return;}
   nameEl.textContent=p.name+' PROVINCE';cnEl.textContent=p.cn;
   const F=FACTIONS[p.owner];tag.textContent=F.name;tag.style.color=F.color;
-  const g=genFor(p);
-  genName.textContent=g?('⚑ '+g.name):'(no commander)';
+  const cmd=commanderOf(p), army=armyOf(p), cap=armyCap(p);
+  genName.innerHTML=cmd?`⚑ ${cmd.name} <span class="lvbadge">Lv${cmd.lvl}</span>`:'(no commander)';
   garr.textContent=p.troops.toLocaleString('en-US')+' men';
-  drawFace(document.getElementById('portrait'),g||{_faction:p.owner,seed:99});
-  if(g){stats.innerHTML='';[['WAR',g.war],['INT',g.int],['CHA',g.cha],['LEAD',g.lead]].forEach(([k,v])=>{
-    const row=document.createElement('div');row.className='stat';
-    row.innerHTML=`<span class="k">${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="n">${v}</span>`;
-    stats.appendChild(row);});}
-  else stats.innerHTML='<div class="hint">This land answers to no famed general — its militia fights untrained.</div>';
-  if(p.owner==='shu'){appointBtn.style.display='';appointBtn.textContent=g?'★ REASSIGN':'★ APPOINT';}
+  drawFace(document.getElementById('portrait'),cmd||{_faction:p.owner,seed:99});
+  stats.innerHTML='';
+  if(cmd){
+    [['WAR',cmd.war],['INT',cmd.int],['CHA',cmd.cha],['LEAD',cmd.lead]].forEach(([k,v])=>{
+      const row=document.createElement('div');row.className='stat';
+      row.innerHTML=`<span class="k">${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="n">${v}</span>`;
+      stats.appendChild(row);});
+    // army officer roster (commander marked ★)
+    let list=`<div class="officers"><div class="ohead">Officers ${army.length}/${cap}</div>`;
+    army.forEach(gm=>{list+=`<div class="orow"><span class="oname">${gm===cmd?'★':'·'} ${gm.name}</span><span class="olv">Lv${gm.lvl}</span><span class="owar">WAR ${gm.war}</span></div>`;});
+    stats.insertAdjacentHTML('beforeend',list+'</div>');
+  }else stats.innerHTML='<div class="hint">This land answers to no famed general — its militia fights untrained.</div>';
+  if(p.owner==='shu'){appointBtn.style.display='';appointBtn.textContent=army.length?'★ OFFICERS':'★ APPOINT';}
   else appointBtn.style.display='none';
   hint.textContent=p.owner==='shu'
     ?'Your province. Recruit, move troops to allies, or launch an attack on a neighbour.'
@@ -753,53 +793,45 @@ function drawBanner(){
   else b.style.display='none';
 }
 
-/* ---------- appoint a commander (ROTK-style roster) ---------- */
-let rosterProv=null, rosterPick=null;
-function appoint(prov,genId){
-  const g=GENById[genId];
-  if(g.loc&&PROVById[g.loc])PROVById[g.loc].gen=null;      // vacate the general's old post
-  if(prov.gen&&prov.gen!==genId)GENById[prov.gen].loc=null; // old commander back to reserve
-  prov.gen=genId;g.loc=prov.id;
-  log(`<b>${g.name}</b> takes command of ${prov.name} Province.`,'shu');
-}
+/* ---------- army manager: add/remove up to `cap` officers (tap to toggle) ---------- */
+let rosterProv=null;
 function openRoster(){
   if(!selected||selected.owner!=='shu')return;
-  rosterProv=selected;rosterPick=null;
+  rosterProv=selected;
   mode='select';target=null;closeOrder();drawBanner();setButtons();
-  document.getElementById('rosterHead').textContent='APPOINT COMMANDER — '+selected.name+' PROVINCE';
-  const row=document.getElementById('rosterRow');row.innerHTML='';
-  rosterOf('shu').forEach((g,i)=>{
-    const card=document.createElement('div');card.className='gcard';card._gid=g.id;
-    const cv=document.createElement('canvas');cv.width=84;cv.height=104;cv.className='ghead';
-    const num=document.createElement('div');num.className='gnum';num.textContent=(i+1)+'.';
-    const nm=document.createElement('div');nm.className='gname';nm.textContent=g.name;
-    const stt=document.createElement('div');stt.className='gstat';
-    stt.textContent=g.loc?(g.loc===rosterProv.id?'▸ HERE':('AT '+PROVById[g.loc].name)):'RESERVE';
-    card.append(num,cv,nm,stt);
-    if(g.loc===rosterProv.id)card.classList.add('cur');
-    // touch-friendly: first tap selects, tapping the selected card again confirms
-    card.onclick=()=>{if(rosterPick===g.id){confirmRoster();}else{rosterPick=g.id;renderRosterSel();}};
-    row.appendChild(card);drawFace(cv,g);
-  });
-  renderRosterSel();
+  renderRoster();
   document.getElementById('roster').classList.add('on');
 }
-function renderRosterSel(){
-  document.querySelectorAll('#rosterRow .gcard').forEach(c=>c.classList.toggle('sel',c._gid===rosterPick));
-  const s=document.getElementById('rosterStats');
-  if(!rosterPick){s.innerHTML='<div class="hint">Tap an officer of Shu, then Confirm — or tap the selected card again to appoint.</div>';return;}
-  const g=GENById[rosterPick];
-  s.innerHTML='<div class="rname">⚑ '+g.name+(g.loc?('  ·  '+(g.loc===rosterProv.id?'already here':'currently at '+PROVById[g.loc].name)):'  ·  in reserve')+'</div>'+
-    [['WAR',g.war],['INT',g.int],['CHA',g.cha],['LEAD',g.lead]].map(([k,v])=>
-      `<div class="stat"><span class="k">${k}</span><span class="bar"><i style="width:${v}%"></i></span><span class="n">${v}</span></div>`).join('');
+function renderRoster(){
+  const p=rosterProv, army=armyOf(p), cmd=commanderOf(p), cap=armyCap(p);
+  document.getElementById('rosterHead').textContent=`ARMY — ${p.name} · Officers ${army.length}/${cap}`;
+  const row=document.getElementById('rosterRow');row.innerHTML='';
+  rosterOf('shu').forEach(g=>{
+    const inHere=(p.army||[]).includes(g.id);
+    const card=document.createElement('div');card.className='gcard'+(inHere?' sel':'');card._gid=g.id;
+    const cv=document.createElement('canvas');cv.width=84;cv.height=104;cv.className='ghead';
+    const badge=document.createElement('div');badge.className='gnum';badge.textContent=`Lv${g.lvl}`+(inHere&&g===cmd?' ★':'');
+    const nm=document.createElement('div');nm.className='gname';nm.textContent=g.name;
+    const stt=document.createElement('div');stt.className='gstat';
+    stt.textContent=inHere?'IN ARMY':(g.loc?('AT '+PROVById[g.loc].name):'RESERVE');
+    card.append(badge,cv,nm,stt);
+    card.onclick=()=>toggleMember(g.id);
+    row.appendChild(card);drawFace(cv,g);
+  });
+  const s=document.getElementById('rosterStats'), others=army.filter(g=>g!==cmd);
+  s.innerHTML = army.length
+    ? `<div class="rname">★ ${cmd.name} leads · Lv${cmd.lvl} → ${cap} slot${cap>1?'s':''}</div>`
+      + `<div class="hint">${others.length?('Also: '+others.map(g=>g.name+' (Lv'+g.lvl+')').join(', ')):'Tap another officer to add. A higher-level commander leads more.'}</div>`
+    : '<div class="hint">Tap officers to add them to this army. The commander\'s level sets how many can serve (up to 4).</div>';
 }
-function confirmRoster(){
-  if(!rosterPick||!rosterProv){closeRoster();return;}
-  const g=GENById[rosterPick];
-  if(g.loc!==rosterProv.id)appoint(rosterProv,rosterPick);
-  closeRoster();renderPanel();
+function toggleMember(id){
+  const p=rosterProv;
+  if((p.army||[]).includes(id)) removeFromArmy(p,id);
+  else if(!addToArmy(p,id)) log('Army is full — raise the commander\'s level to lead more officers.','sys');
+  renderRoster(); renderPanel();
 }
-function closeRoster(){document.getElementById('roster').classList.remove('on');rosterProv=null;rosterPick=null;}
+function confirmRoster(){closeRoster();}                 // CONFIRM = done (changes apply live)
+function closeRoster(){document.getElementById('roster').classList.remove('on');rosterProv=null;renderPanel();}
 
 /* ---------- orders (slider) ---------- */
 let orderKind=null; // 'recruit'|'move'|'attack'
@@ -836,35 +868,48 @@ function confirmOrder(){
   closeOrder();mode='select';target=null;drawBanner();renderPanel();updateHUD();checkVictory();
 }
 
-/* ---------- battle ---------- */
-function power(troops,gen,defending){
-  const g=gen||{war:45,lead:55};
-  const base=troops*(1+g.war/140)*(0.6+g.lead/220);
+/* ---------- battle: the whole army fights, commander + 35% of each other's WAR ---------- */
+function armyPower(troops,gens,defending){
+  const cmd=gens&&gens.length
+    ? gens.reduce((b,g)=>(g.lvl>b.lvl||(g.lvl===b.lvl&&g.lead>b.lead))?g:b)
+    : {war:45,lead:55};
+  const others=(gens||[]).filter(g=>g!==cmd);
+  const effWar=cmd.war+0.35*others.reduce((s,g)=>s+g.war,0); // extra officers add 35% WAR each
+  const base=troops*(1+effWar/140)*(0.6+cmd.lead/220);
   const luck=0.82+Math.random()*0.36;
   return base*luck*(defending?1.18:1);
 }
+// XP for a won battle: commander +60, each other officer +30; level-up grows stats + slots
+function grantXP(gens){gens.forEach((g,i)=>{g.xp=(g.xp||0)+(i===0?60:30);while(g.xp>=g.lvl*100&&g.lvl<5){g.xp-=g.lvl*100;levelUp(g);}});}
+function levelUp(g){
+  g.lvl++;
+  ['war','int','cha','lead'].forEach(k=>g[k]=Math.min(100,g[k]+2));
+  log(`<b>${g.name}</b> rises to <b>Lv${g.lvl}</b>! ${g.lvl>=2&&g.lvl<=4?`(can now lead ${g.lvl} officers)`:''}`,'win');
+}
 function doBattle(from,to,commit,attackerFaction){
-  const ag=genFor(from), dg=genFor(to);
-  const ap=power(commit,ag,false), dp=power(to.troops,dg,true);
+  commit=Math.min(commit,from.troops); // never send more than the province holds
+  const aArmy=armyOf(from), dArmy=armyOf(to);
+  const ap=armyPower(commit,aArmy,false), dp=armyPower(to.troops,dArmy,true);
   from.troops-=commit;
-  const total=ap+dp;
   const fc=FACTIONS[attackerFaction].logClass, dc=FACTIONS[to.owner].logClass;
   if(ap>dp){
     // attacker wins — survivors proportional to the margin of victory
     const surv=Math.max(100,Math.round(commit*(ap-dp)/ap*0.9));
     const defName=FACTIONS[to.owner].name, atkName=FACTIONS[attackerFaction].name;
-    // the beaten commander is captured and removed from play
-    const capd=to.gen;if(capd){GENById[capd].loc=null;GENById[capd].captured=true;}
+    // every defending officer is captured and removed from play
+    (to.army||[]).forEach(id=>{GENById[id].loc=null;GENById[id].captured=true;});
     to.owner=attackerFaction;to.troops=surv;mapDirty=true; // recolour the conquered land
-    // the attacking general rides in only if his home province is now the weaker
-    const movedGen=(ag&&from.troops<surv)?from.gen:null;
-    to.gen=movedGen;
-    if(movedGen){from.gen=null;GENById[movedGen].loc=to.id;}
+    // the victorious army marches into the conquered province, ordered commander-first
+    to.army=[...from.army].sort((x,y)=>GENById[y].lvl-GENById[x].lvl);
+    to.army.forEach(id=>GENById[id].loc=to.id);
+    from.army=[];
+    grantXP(armyOf(to));                                    // victors gain experience
     log(`<span class="${fc}">${atkName}</span> stormed <b>${to.name}</b>, routing <span class="${dc}">${defName}</span>! (${surv.toLocaleString()} hold the walls)`,fc);
   }else{
-    // defender holds; both sides bleed, defender keeps a garrison
+    // defender holds; both sides bleed, defender keeps a garrison and gains XP
     const defLoss=Math.min(to.troops-100,Math.round(to.troops*(ap/dp)*0.55));
     to.troops=Math.max(100,to.troops-defLoss);
+    grantXP(dArmy);
     log(`<span class="${fc}">${FACTIONS[attackerFaction].name}</span>'s assault on <b>${to.name}</b> was repelled. Attackers lost ${commit.toLocaleString()} men.`,dc);
   }
 }
