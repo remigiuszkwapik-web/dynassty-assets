@@ -25,6 +25,8 @@ Works on desktop and **phone** (portrait) — everything is tap-driven, no doubl
 - **Levels & growth:** each general has a level (shown as `Lv N`). Winning battles
   grants XP; on level-up their War/Int/Cha/Lead rise and the army can hold one more
   officer. Generals start at set ranks (e.g. Cao Cao and Lü Bu at Lv 4).
+- **An officer must lead the march:** a province with no officer (militia) can still
+  recruit and defend, but cannot move troops out or attack — appoint a general first.
 - **Battles** resolve by troop strength × the commander's War/Lead + **35 % of each
   other officer's War** + luck. Winning an assault marches the whole army into the
   conquered province; the defenders' officers are captured and leave play.

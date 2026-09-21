@@ -771,15 +771,18 @@ function renderPanel(){
   if(p.owner==='shu'){appointBtn.style.display='';appointBtn.textContent=army.length?'★ OFFICERS':'★ APPOINT';}
   else appointBtn.style.display='none';
   hint.textContent=p.owner==='shu'
-    ?'Your province. Recruit, move troops to allies, or launch an attack on a neighbour.'
+    ?(army.length
+        ?'Your province. Recruit, move troops to allies, or launch an attack on a neighbour.'
+        :'No officer here — troops can\'t march without a general. Appoint one to move or attack.')
     :'Enemy province. Select one of YOUR neighbouring provinces, then press Attack.';
   setButtons();
 }
 function setButtons(){
   const own=selected&&selected.owner==='shu';
+  const led=own&&armyOf(selected).length>0; // troops need an officer to march
   document.getElementById('btnRecruit').disabled=!own;
-  document.getElementById('btnMove').disabled=!own||legalNeighbours('move').length===0;
-  document.getElementById('btnAttack').disabled=!own||legalNeighbours('attack').length===0;
+  document.getElementById('btnMove').disabled=!led||legalNeighbours('move').length===0;
+  document.getElementById('btnAttack').disabled=!led||legalNeighbours('attack').length===0;
   document.getElementById('btnMove').classList.toggle('on',mode==='move');
   document.getElementById('btnAttack').classList.toggle('on',mode==='attack');
 }
