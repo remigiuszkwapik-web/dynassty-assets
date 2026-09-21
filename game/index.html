@@ -1,5 +1,5 @@
 <title>Dynasty Tactics</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
@@ -26,6 +26,9 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0}
+  /* touch: no 300ms delay / double-tap zoom on controls, no grey tap flash */
+  .btn,.gcard,#map,#toolbar,input[type=range]{touch-action:manipulation}
+  button,canvas,.gcard,#log{-webkit-tap-highlight-color:transparent}
   body{
     background:
       radial-gradient(120% 90% at 50% 0%, #0b1430 0%, #05070f 60%, #03050b 100%);
@@ -208,6 +211,39 @@
     background:#050c1c;border:2px solid #16305c;border-radius:6px;padding:10px 14px;max-width:420px;margin:0 auto;width:100%}
   #rosterStats .rname{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--led);margin-bottom:2px}
   #rosterBtns{display:flex;gap:10px;justify-content:center}
+
+  /* ══ Portrait phones (iPhone): bigger tap targets, stacked, no side-scroll ══ */
+  @media (max-width:640px){
+    body{padding:6px}
+    #crt{padding:8px;border-radius:10px}
+    #crt::after,#crt::before{inset:8px}
+    #title{font-size:11px}
+    #hud{padding:8px;gap:7px}
+    .hud-chip{padding:7px 9px}
+    .hud-chip .val{font-size:11px}
+    .hud-chip .lbl{font-size:12px}
+    #stage{gap:10px}
+    #panel{min-height:0}
+    #portrait{width:100px;height:124px}
+    /* comfortable finger targets */
+    .btn{padding:13px 14px;min-height:46px;display:flex;align-items:center;justify-content:center}
+    #toolbar{gap:8px}
+    #toolbar .btn{flex:1 1 40%}
+    #btnEnd{flex:1 1 100%}
+    #toolbar .spacer{display:none}
+    #orderRange{height:30px}
+    #log{height:110px;font-size:16px}
+    /* overlays become full-screen modals so the portrait cards get room + scroll */
+    #over,#roster{position:fixed;inset:8px;z-index:999;padding:12px;
+      overflow:auto;-webkit-overflow-scrolling:touch;justify-content:flex-start}
+    #rosterHead{font-size:11px}
+    #rosterRow{gap:8px}
+    .gcard{width:44%;max-width:150px}
+    .gcard .ghead{width:76px;height:94px}
+    #rosterBtns .btn{flex:1 1 40%}
+  }
+  /* very narrow: single-column toolbar */
+  @media (max-width:380px){ #toolbar .btn{flex:1 1 100%} .gcard{width:46%} }
 </style>
 
 <div id="crt">
@@ -741,8 +777,8 @@ function openRoster(){
     stt.textContent=g.loc?(g.loc===rosterProv.id?'▸ HERE':('AT '+PROVById[g.loc].name)):'RESERVE';
     card.append(num,cv,nm,stt);
     if(g.loc===rosterProv.id)card.classList.add('cur');
-    card.onclick=()=>{rosterPick=g.id;renderRosterSel();};
-    card.ondblclick=()=>{rosterPick=g.id;confirmRoster();};
+    // touch-friendly: first tap selects, tapping the selected card again confirms
+    card.onclick=()=>{if(rosterPick===g.id){confirmRoster();}else{rosterPick=g.id;renderRosterSel();}};
     row.appendChild(card);drawFace(cv,g);
   });
   renderRosterSel();
@@ -751,7 +787,7 @@ function openRoster(){
 function renderRosterSel(){
   document.querySelectorAll('#rosterRow .gcard').forEach(c=>c.classList.toggle('sel',c._gid===rosterPick));
   const s=document.getElementById('rosterStats');
-  if(!rosterPick){s.innerHTML='<div class="hint">Choose an officer of Shu to take command. Double-click to appoint.</div>';return;}
+  if(!rosterPick){s.innerHTML='<div class="hint">Tap an officer of Shu, then Confirm — or tap the selected card again to appoint.</div>';return;}
   const g=GENById[rosterPick];
   s.innerHTML='<div class="rname">⚑ '+g.name+(g.loc?('  ·  '+(g.loc===rosterProv.id?'already here':'currently at '+PROVById[g.loc].name)):'  ·  in reserve')+'</div>'+
     [['WAR',g.war],['INT',g.int],['CHA',g.cha],['LEAD',g.lead]].map(([k,v])=>

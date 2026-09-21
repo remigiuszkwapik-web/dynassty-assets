@@ -11,6 +11,8 @@ Cao Cao and Sun Ce).
 **Play it:** open [`game/index.html`](game/index.html) in any modern browser.
 It is a single self-contained file (fonts load from Google Fonts).
 
+Works on desktop and **phone** (portrait) — everything is tap-driven, no double-click.
+
 ### How to play
 - **Select** one of your provinces (green = House Shu) on the map.
 - **✚ Recruit** troops with gold, **➜ Move** troops to a neighbouring friendly
